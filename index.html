@@ -61,8 +61,14 @@
 <div class="container">
     <h1>SelectSGS Web</h1>
 
-    <label>Required Capacity (BTUH)</label>
-    <input id="Capacity" type="number">
+    <label>Required Capacity (BTUH; 1 MBH = 1,000 BTUH)</label>
+    <input id="Capacity" type="number" min="1">
+
+    <label>Lower Capacity Tolerance (%)</label>
+    <input id="Lower Tolerance" type="number" value="-10" min="-100" max="0" step="any">
+
+    <label>Upper Capacity Tolerance (%)</label>
+    <input id="Upper Tolerance" type="number" value="10" min="0" step="any">
 
     <label>SST (°F)</label>
     <input id="Condensing Temperature" type="number">
@@ -93,32 +99,181 @@
 
 <script>
 
+const wetBulbTemperatures = [
+    50, 55, 60, 62, 64, 66, 68, 70, 72, 74, 75, 76, 77, 78, 80, 82, 84, 86
+];
+const correctionFactorRows = [
+    { condensingTemperature: 85, factors: [0.98, 1.09, 1.24, 1.34, 1.44, 1.56, 1.72, 1.9, 2.16, 2.48, 2.7, 2.94, 3.25, 3.57, null, null, null, null] },
+    { condensingTemperature: 90, factors: [0.83, 0.91, 1.02, 1.08, 1.14, 1.21, 1.29, 1.4, 1.53, 1.69, 1.79, 1.89, 2.01, 2.12, 2.54, 3.12, null, null] },
+    { condensingTemperature: 95, factors: [0.71, 0.78, 0.85, 0.89, 0.94, 0.98, 1.03, 1.09, 1.17, 1.25, 1.29, 1.34, 1.39, 1.47, 1.63, 1.85, 2.12, 2.47] },
+    { condensingTemperature: 96.3, factors: [0.69, 0.75, 0.82, 0.86, 0.9, 0.94, 0.98, 1.03, 1.1, 1.18, 1.22, 1.26, 1.31, 1.37, 1.51, 1.71, 1.94, 2.25] },
+    { condensingTemperature: 100, factors: [0.63, 0.68, 0.73, 0.76, 0.79, 0.81, 0.84, 0.87, 0.92, 0.97, 1, 1.03, 1.07, 1.11, 1.2, 1.3, 1.46, 1.63] },
+    { condensingTemperature: 105, factors: [0.56, 0.59, 0.62, 0.64, 0.67, 0.69, 0.71, 0.74, 0.78, 0.81, 0.83, 0.85, 0.87, 0.89, 0.95, 1.01, 1.1, 1.21] },
+    { condensingTemperature: 110, factors: [0.5, 0.53, 0.55, 0.57, 0.58, 0.6, 0.62, 0.63, 0.66, 0.69, 0.7, 0.71, 0.73, 0.75, 0.79, 0.83, 0.87, 0.93] }
+];
+const units = [
+    { model: "IEC-B-1012-AAB", baseHor: 3875.6, fanMotor: "2 x 3" },
+    { model: "IEC-B-1012-NAB", baseHor: 4414.3, fanMotor: "2 x 5" },
+    { model: "IEC-B-1012-PAB", baseHor: 4870.3, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1012-QAB", baseHor: 5201.8, fanMotor: "2 x 10" },
+    { model: "IEC-B-1012-NAC", baseHor: 4994.7, fanMotor: "2 x 5" },
+    { model: "IEC-B-1012-PAC", baseHor: 5512.9, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1012-QAC", baseHor: 5906.6, fanMotor: "2 x 10" },
+    { model: "IEC-B-1012-PAD", baseHor: 5595.8, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1012-QAD", baseHor: 5989.5, fanMotor: "2 x 10" },
+    { model: "IEC-B-1012-NAJ", baseHor: 5567, fanMotor: "2 x 5" },
+    { model: "IEC-B-1012-PAJ", baseHor: 5906.6, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1012-QAJ", baseHor: 6321.1, fanMotor: "2 x 10" },
+    { model: "IEC-B-1012-PAE", baseHor: 6963.6, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1012-QAE", baseHor: 6031, fanMotor: "2 x 10" },
+    { model: "IEC-B-1012-NAK", baseHor: 6466.2, fanMotor: "2 x 5" },
+    { model: "IEC-B-1012-PAK", baseHor: 5782.3, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1012-QAK", baseHor: 6362.6, fanMotor: "2 x 10" },
+    { model: "IEC-B-1012-SLJ", baseHor: 6818.5, fanMotor: "2 x 15" },
+    { model: "IEC-B-1012-SLK", baseHor: 7543.9, fanMotor: "2 x 15" },
+    { model: "IEC-B-1018-BAB", baseHor: 5947.9, fanMotor: "3 x 3" },
+    { model: "IEC-B-1018-PAB", baseHor: 6776.9, fanMotor: "3 x 5" },
+    { model: "IEC-B-1018-CAB", baseHor: 7460.8, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1018-SAB", baseHor: 7999.7, fanMotor: "3 x 10" },
+    { model: "IEC-B-1018-PAC", baseHor: 7502.5, fanMotor: "3 x 5" },
+    { model: "IEC-B-1018-CAC", baseHor: 8248.6, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1018-SAC", baseHor: 8828.9, fanMotor: "3 x 10" },
+    { model: "IEC-B-1018-CAD", baseHor: 8600.9, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1018-SAD", baseHor: 9119, fanMotor: "3 x 10" },
+    { model: "IEC-B-1018-PAJ", baseHor: 8435.1, fanMotor: "3 x 5" },
+    { model: "IEC-B-1018-CAJ", baseHor: 8953.2, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1018-SAJ", baseHor: 9616.4, fanMotor: "3 x 10" },
+    { model: "IEC-B-1018-CAE", baseHor: 10694.1, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1018-SAE", baseHor: 9243.4, fanMotor: "3 x 10" },
+    { model: "IEC-B-1018-PAK", baseHor: 9865.1, fanMotor: "3 x 5" },
+    { model: "IEC-B-1018-CAK", baseHor: 8580.2, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1018-SAK", baseHor: 9575, fanMotor: "3 x 10" },
+    { model: "IEC-B-1018-DLJ", baseHor: 10404, fanMotor: "3 x 15" },
+    { model: "IEC-B-1018-DLK", baseHor: 11460.9, fanMotor: "3 x 15" },
+    { model: "IEC-B-1212-AAB", baseHor: 4439, fanMotor: "2 x 3" },
+    { model: "IEC-B-1212-NAB", baseHor: 5027.4, fanMotor: "2 x 5" },
+    { model: "IEC-B-1212-PAB", baseHor: 5541.9, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1212-QAB", baseHor: 5939, fanMotor: "2 x 10" },
+    { model: "IEC-B-1212-NAC", baseHor: 5601, fanMotor: "2 x 5" },
+    { model: "IEC-B-1212-PAC", baseHor: 6174, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1212-QAC", baseHor: 6629.7, fanMotor: "2 x 10" },
+    { model: "IEC-B-1212-PAD", baseHor: 6445.5, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1212-QAD", baseHor: 6923.7, fanMotor: "2 x 10" },
+    { model: "IEC-B-1212-QAJ", baseHor: 7541.1, fanMotor: "2 x 10" },
+    { model: "IEC-B-1212-PAE", baseHor: 7217.7, fanMotor: "2 x 7.5" },
+    { model: "IEC-B-1212-QAE", baseHor: 7953, fanMotor: "2 x 10" },
+    { model: "IEC-B-1212-QAK", baseHor: 8526, fanMotor: "2 x 10" },
+    { model: "IEC-B-1212-SLD", baseHor: 6963.6, fanMotor: "2 x 15" },
+    { model: "IEC-B-1212-SLJ", baseHor: 7481.7, fanMotor: "2 x 15" },
+    { model: "IEC-B-1212-TLJ", baseHor: 8144.9, fanMotor: "2 x 20" },
+    { model: "IEC-B-1212-SLE", baseHor: 7894, fanMotor: "2 x 15" },
+    { model: "IEC-B-1212-SLK", baseHor: 8599.5, fanMotor: "2 x 15" },
+    { model: "IEC-B-1212-TLK", baseHor: 9202.2, fanMotor: "2 x 20" },
+    { model: "IEC-B-1218-BAB", baseHor: 7233, fanMotor: "3 x 3" },
+    { model: "IEC-B-1218-PAB", baseHor: 7732.2, fanMotor: "3 x 5" },
+    { model: "IEC-B-1218-CAB", baseHor: 8540.7, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1218-SAB", baseHor: 9158.4, fanMotor: "3 x 10" },
+    { model: "IEC-B-1218-PAC", baseHor: 8555, fanMotor: "3 x 5" },
+    { model: "IEC-B-1218-CAC", baseHor: 9437.4, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1218-SAC", baseHor: 10113.8, fanMotor: "3 x 10" },
+    { model: "IEC-B-1218-CAD", baseHor: 9761, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1218-SAD", baseHor: 10452, fanMotor: "3 x 10" },
+    { model: "IEC-B-1218-SAJ", baseHor: 11540, fanMotor: "3 x 10" },
+    { model: "IEC-B-1218-CAE", baseHor: 11025, fanMotor: "3 x 7.5" },
+    { model: "IEC-B-1218-SAE", baseHor: 12157, fanMotor: "3 x 10" },
+    { model: "IEC-B-1218-SAK", baseHor: 13039, fanMotor: "3 x 10" },
+    { model: "IEC-B-1218-DLD", baseHor: 10528.3, fanMotor: "3 x 15" },
+    { model: "IEC-B-1218-DLJ", baseHor: 11295.1, fanMotor: "3 x 15" },
+    { model: "IEC-B-1218-VLJ", baseHor: 12455.7, fanMotor: "3 x 20" },
+    { model: "IEC-B-1218-DLE", baseHor: 11937.6, fanMotor: "3 x 15" },
+    { model: "IEC-B-1218-DLK", baseHor: 13156.5, fanMotor: "3 x 15" },
+    { model: "IEC-B-1218-VLK", baseHor: 14067.9, fanMotor: "3 x 20" }
+];
+
+function interpolateFromPoints(points, value) {
+    let lowerIndex = 0;
+    const upperIndex = points.findIndex(point => point.x >= value);
+
+    if (upperIndex === -1) {
+        lowerIndex = points.length - 2;
+    } else if (upperIndex > 0) {
+        lowerIndex = upperIndex - 1;
+    }
+
+    const lower = points[lowerIndex];
+    const upper = points[lowerIndex + 1];
+    const proportion = (value - lower.x) / (upper.x - lower.x);
+    return lower.y + proportion * (upper.y - lower.y);
+}
+
+function getCorrectionFactor(condensingTemperature, wetBulbTemperature) {
+    const factorsByCondensingTemperature = correctionFactorRows.map(row => {
+        const points = row.factors
+            .map((factor, index) => ({ x: wetBulbTemperatures[index], y: factor }))
+            .filter(point => point.y !== null);
+        return {
+            x: row.condensingTemperature,
+            y: interpolateFromPoints(points, wetBulbTemperature)
+        };
+    });
+
+    return interpolateFromPoints(factorsByCondensingTemperature, condensingTemperature);
+}
+
 function findUnit() {
 
-    let capacity =
-        document.getElementById("Capacity").value;
+    const capacity = Number(document.getElementById("Capacity").value);
+    const condensingTemperatureInput = document.getElementById("Condensing Temperature").value;
+    const wetBulbTemperatureInput = document.getElementById("Wet Bulb Temperature").value;
+    const condensingTemperature = Number(condensingTemperatureInput);
+    const wetBulbTemperature = Number(wetBulbTemperatureInput);
+    const lowerTolerance = Number(document.getElementById("Lower Tolerance").value);
+    const upperTolerance = Number(document.getElementById("Upper Tolerance").value);
+    const result = document.getElementById("result");
 
-    let result =
-        document.getElementById("result");
+    if (!Number.isFinite(capacity) || capacity <= 0 ||
+        condensingTemperatureInput.trim() === "" || !Number.isFinite(condensingTemperature) ||
+        wetBulbTemperatureInput.trim() === "" || !Number.isFinite(wetBulbTemperature) ||
+        !Number.isFinite(lowerTolerance) || !Number.isFinite(upperTolerance) ||
+        lowerTolerance < -100 || lowerTolerance > 0 ||
+        upperTolerance < 0 || lowerTolerance > upperTolerance) {
+        result.textContent =
+            "Enter a capacity greater than zero, valid SST and TD values, a lower tolerance from -100% to 0%, and a nonnegative upper tolerance.";
+        return;
+    }
 
-    if(capacity < 25000)
-    {
-        result.innerHTML =
-        `
-        <h3>Recommended Unit</h3>
-        IEC1224-2A<br>
-        Capacity: 24,500 BTUH
-        `;
-    }
-    else
-    {
-        result.innerHTML =
-        `
-        <h3>Recommended Unit</h3>
-        IEC1224-4A<br>
-        Capacity: 32,000 BTUH
-        `;
-    }
+    const correctionFactor = getCorrectionFactor(condensingTemperature, wetBulbTemperature);
+    const minimumCapacity = capacity * (1 + lowerTolerance / 100);
+    const maximumCapacity = capacity * (1 + upperTolerance / 100);
+    const matchingUnits = units
+        .map(unit => {
+            const correctedHor = unit.baseHor * correctionFactor;
+            const correctedCapacity = correctedHor * 1000;
+            return {
+                ...unit,
+                correctedHor,
+                capacityPercent: correctedCapacity / capacity * 100
+            };
+        })
+        .filter(unit =>
+            unit.correctedHor * 1000 >= minimumCapacity &&
+            unit.correctedHor * 1000 <= maximumCapacity
+        )
+        .sort((a, b) => a.capacityPercent - b.capacityPercent);
+
+    result.innerHTML = `
+        <h3>Matching Units</h3>
+        <p>Capacity range: ${minimumCapacity.toLocaleString()}–${maximumCapacity.toLocaleString()} BTUH</p>
+        <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
+        ${matchingUnits.length
+            ? `<table>
+                <thead><tr><th>Model</th><th>Fan Motor (hp)</th><th>Base HOR (MBH)</th><th>Corrected HOR (MBH)</th><th>Capacity (%)</th></tr></thead>
+                <tbody>${matchingUnits.map(unit =>
+                    `<tr><td>${unit.model}</td><td>${unit.fanMotor}</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.capacityPercent.toFixed(1)}%</td></tr>`
+                ).join("")}</tbody>
+            </table>`
+            : "<p>No units match the selected capacity range.</p>"}
+    `;
 }
 
 </script>
