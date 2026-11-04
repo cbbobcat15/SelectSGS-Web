@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SelectSGS Web</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            margin: 40px;
+        }
+
+        .container {
+            max-width: 700px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,.1);
+        }
+
+        h1 {
+            color: #004f9f;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+        }
+
+        button {
+            margin-top: 25px;
+            padding: 12px 20px;
+            background-color: #004f9f;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #003a75;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #eef5ff;
+            border-left: 5px solid #004f9f;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>SelectSGS Web</h1>
+
+    <label>Required Capacity (BTUH)</label>
+    <input id="Capacity" type="number">
+
+    <label>SST (°F)</label>
+    <input id="Condensing Temperature" type="number">
+
+    <label>TD (°F)</label>
+    <input id="Wet Bulb Temperature" type="number">
+
+    <label>Refrigerant</label>
+    <select id="Refrigerant">
+        <option value="R717">R717</option>
+        <option value="R22">R22</option>
+    </select>
+
+    <label>Motor Voltage</label>
+    <select id="Motor Voltage">
+        <option value="460/3/60">460/3/60</option>
+        <option value="575/3/60">575/3/60</option>
+    </select>
+
+    <button onclick="findUnit()">
+        Find Unit
+    </button>
+
+    <div id="result" class="result">
+        Enter design conditions and click Find Unit.
+    </div>
+</div>
+
+<script>
+
+function findUnit() {
+
+    let capacity =
+        document.getElementById("Capacity").value;
+
+    let result =
+        document.getElementById("result");
+
+    if(capacity < 25000)
+    {
+        result.innerHTML =
+        `
+        <h3>Recommended Unit</h3>
+        IEC1224-2A<br>
+        Capacity: 24,500 BTUH
+        `;
+    }
+    else
+    {
+        result.innerHTML =
+        `
+        <h3>Recommended Unit</h3>
+        IEC1224-4A<br>
+        Capacity: 32,000 BTUH
+        `;
+    }
+}
+
+</script>
+
+</body>
+</html>
