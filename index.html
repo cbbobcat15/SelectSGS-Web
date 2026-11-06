@@ -73,6 +73,12 @@
             text-align: center;
         }
 
+        thead th {
+            border-top: 0;
+            border-bottom: 2px solid #53677a;
+            font-size: calc(1em + 2pt);
+        }
+
         th:first-child,
         td:first-child {
             text-align: left;
@@ -103,11 +109,11 @@
     <label>Required Capacity (MBH)</label>
     <input id="Capacity" type="number" min="1">
 
-    <label>Lower Capacity Tolerance (%)</label>
-    <input id="Lower Tolerance" type="number" value="-10" min="-100" max="0" step="any">
-
-    <label>Upper Capacity Tolerance (%)</label>
-    <input id="Upper Tolerance" type="number" value="10" min="0" step="any">
+    <label>Refrigerant</label>
+    <select id="Refrigerant">
+        <option value="R717">R717</option>
+        <option value="R22">R22</option>
+    </select>
 
     <label>Condensing Temperature (°F)</label>
     <input id="Condensing Temperature" type="number">
@@ -115,17 +121,17 @@
     <label>Wet Bulb Temperature (°F)</label>
     <input id="Wet Bulb Temperature" type="number">
 
-    <label>Refrigerant</label>
-    <select id="Refrigerant">
-        <option value="R717">R717</option>
-        <option value="R22">R22</option>
-    </select>
-
     <label>Motor Voltage</label>
     <select id="Motor Voltage">
         <option value="460/3/60">460/3/60</option>
         <option value="575/3/60">575/3/60</option>
     </select>
+
+    <label>Upper Capacity Tolerance (%)</label>
+    <input id="Upper Tolerance" type="number" value="10" min="0" step="any">
+
+    <label>Lower Capacity Tolerance (%)</label>
+    <input id="Lower Tolerance" type="number" value="-10" min="-100" max="0" step="any">
 
     <button onclick="findUnit()">
         Find Unit
@@ -466,7 +472,7 @@ function findUnit() {
             ? `<table>
                 <thead><tr><th>Model</th><th>Capacity<br><span class="table-unit">(%)</span></th><th>Base HOR<br><span class="table-unit">(MBH)</span></th><th>Corrected HOR<br><span class="table-unit">(MBH)</span></th><th>Air Flow<br><span class="table-unit">(CFM)</span></th><th>Fan Motor<br><span class="table-unit">(HP)</span></th><th>Internal Coil Volume<br><span class="table-unit">(ft^3)</span></th><th>R717 Charge<br><span class="table-unit">(lb)</span></th></tr></thead>
                 <tbody>${matchingUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
+                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
                 ).join("")}</tbody>
             </table>`
             : "<p>No units match the selected capacity range.</p>"}
