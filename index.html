@@ -73,7 +73,7 @@
     <label>Condensing Temperature (°F)</label>
     <input id="Condensing Temperature" type="number">
 
-    <label>WEt Bulb Temperature (°F)</label>
+    <label>Wet Bulb Temperature (°F)</label>
     <input id="Wet Bulb Temperature" type="number">
 
     <label>Refrigerant</label>
@@ -247,7 +247,7 @@ function findUnit() {
     const maximumCapacity = capacity * (1 + upperTolerance / 100);
     const matchingUnits = units
         .map(unit => {
-            const correctedHor = unit.baseHor * correctionFactor;
+            const correctedHor = unit.baseHor / correctionFactor;
             const correctedCapacity = correctedHor * 1000;
             return {
                 ...unit,
