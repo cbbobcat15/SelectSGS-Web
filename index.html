@@ -70,10 +70,10 @@
     <label>Upper Capacity Tolerance (%)</label>
     <input id="Upper Tolerance" type="number" value="10" min="0" step="any">
 
-    <label>SST (°F)</label>
+    <label>Condensing Temperature (°F)</label>
     <input id="Condensing Temperature" type="number">
 
-    <label>TD (°F)</label>
+    <label>WEt Bulb Temperature (°F)</label>
     <input id="Wet Bulb Temperature" type="number">
 
     <label>Refrigerant</label>
@@ -238,7 +238,7 @@ function findUnit() {
         lowerTolerance < -100 || lowerTolerance > 0 ||
         upperTolerance < 0 || lowerTolerance > upperTolerance) {
         result.textContent =
-            "Enter a capacity greater than zero, valid SST and TD values, a lower tolerance from -100% to 0%, and a nonnegative upper tolerance.";
+            "Enter a capacity greater than zero, valid CT and WB values, a lower tolerance from -100% to 0%, and a nonnegative upper tolerance.";
         return;
     }
 
