@@ -1,112 +1,186 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>SelectSGS Web</title>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SelectSGS Web | Project Information</title>
     <style>
         * {
             box-sizing: border-box;
         }
 
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
             margin: 0;
             padding: 24px;
+            background: #f4f6f8;
+            color: #263746;
+            font-family: Arial, sans-serif;
         }
 
-        .container {
-            width: 100%;
-            background: white;
+        main {
+            width: min(100%, 900px);
+            margin: 0 auto;
             padding: 30px;
+            background: white;
             border-radius: 10px;
-            box-shadow: 0px 4px 10px rgba(0,0,0,.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
         }
 
         h1 {
+            margin-top: 0;
             color: #004f9f;
+        }
+
+        .intro {
+            margin-bottom: 24px;
+            color: #53677a;
+        }
+
+        form {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px 24px;
+        }
+
+        .field {
+            min-width: 0;
+        }
+
+        .field-wide {
+            grid-column: 1 / -1;
         }
 
         label {
             display: block;
-            margin-top: 15px;
+            margin-bottom: 6px;
             font-weight: bold;
         }
 
-        input {
-            width: 20%;
-            min-width: 180px;
-            max-width: 100%;
-            padding: 10px;
-            margin-top: 5px;
+        .required {
+            color: #a12622;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            min-height: 42px;
+            padding: 9px 10px;
+            border: 1px solid #8797a5;
+            border-radius: 3px;
+            background: white;
+            color: inherit;
+            font: inherit;
+        }
+
+        textarea {
+            min-height: 76px;
+            resize: vertical;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: 2px solid #7db3e6;
+            outline-offset: 1px;
         }
 
         button {
-            display: block;
-            margin-top: 25px;
+            grid-column: 1 / -1;
+            justify-self: start;
+            margin-top: 4px;
             padding: 12px 20px;
-            background-color: #004f9f;
+            border: 0;
+            border-radius: 3px;
+            background: #004f9f;
             color: white;
-            border: none;
+            font: inherit;
+            font-weight: bold;
             cursor: pointer;
         }
 
         button:hover {
-            background-color: #003a75;
+            background: #003a75;
         }
 
-        .result {
+        #form-error {
+            grid-column: 1 / -1;
+            margin: 0;
+            color: #a12622;
+        }
+
+        .unit-list {
             margin-top: 30px;
-            padding: 20px;
-            background-color: #eef5ff;
-            border-left: 5px solid #004f9f;
+        }
+
+        .unit-list h2 {
+            color: #004f9f;
+        }
+
+        .unit-table-wrapper {
             overflow-x: auto;
         }
 
-        table {
+        .unit-list table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
-        th,
-        td {
-            border-top: 1px solid #9aa8b5;
-            border-bottom: 1px solid #9aa8b5;
-            padding: 8px;
+        .unit-list th,
+        .unit-list td {
+            border: 1px solid #53677a;
+            padding: 3px;
+        }
+
+        .unit-list th {
+            background: #d6d6d6;
+            font-weight: normal;
+        }
+
+        .unit-list th:first-child,
+        .unit-list td:first-child {
+            width: 32px;
             text-align: center;
         }
 
-        thead th {
-            border-top: 0;
-            border-bottom: 2px solid #53677a;
-            font-size: calc(1em + 2pt);
+        .unit-list th:last-child,
+        .unit-list td:last-child {
+            width: 120px;
         }
 
-        thead th button {
-            display: inline;
-            width: auto;
-            margin: 0;
-            padding: 0;
+        .unit-list td:first-child {
+            background: #f1c48f;
+        }
+
+        .unit-list td input {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            min-height: 27px;
+            padding: 3px 6px;
             border: 0;
-            background: transparent;
-            color: inherit;
-            font: inherit;
-            cursor: pointer;
+            border-radius: 0;
         }
 
-        thead th button:hover {
+        .unit-list .select-unit {
+            display: block;
+            width: 100%;
+            min-height: 27px;
+            margin: 0;
+            padding: 4px 2px;
+            border: 0;
+            border-radius: 0;
             background: transparent;
+            color: #17212a;
+            font: inherit;
+            text-align: center;
             text-decoration: underline;
         }
 
-        th:first-child,
-        td:first-child {
-            text-align: left;
-        }
-
-        .table-unit {
-            display: block;
-            font-weight: normal;
+        .unit-list .select-unit:hover {
+            background: #dceeff;
+            color: #003a75;
         }
 
         @media (max-width: 600px) {
@@ -114,453 +188,220 @@
                 padding: 12px;
             }
 
-            .container {
+            main {
                 padding: 20px;
+            }
+
+            form {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .field-wide,
+            button,
+            #form-error {
+                grid-column: auto;
             }
         }
     </style>
 </head>
-
 <body>
+<main>
+    <h1>Project Information</h1>
+    <p class="intro">Enter the project details before selecting equipment.</p>
 
-<div class="container">
-    <h1>SelectSGS Web</h1>
+    <form id="project-form">
+        <div class="field">
+            <label for="customer">Customer <span class="required" aria-hidden="true">*</span></label>
+            <input id="customer" name="customer" type="text" autocomplete="organization" required>
+        </div>
+        <div class="field">
+            <label for="project-name">Project Name <span class="required" aria-hidden="true">*</span></label>
+            <input id="project-name" name="projectName" type="text" required>
+        </div>
+        <div class="field">
+            <label for="contact">Contact <span class="required" aria-hidden="true">*</span></label>
+            <input id="contact" name="contact" type="text" autocomplete="name" required>
+        </div>
+        <div class="field">
+            <label for="quote-number">Quote # <span class="required" aria-hidden="true">*</span></label>
+            <input id="quote-number" name="quoteNumber" type="text" required>
+        </div>
+        <div class="field">
+            <label for="prepared-by">Prepared by <span class="required" aria-hidden="true">*</span></label>
+            <input id="prepared-by" name="preparedBy" type="text" autocomplete="name" required>
+        </div>
+        <div class="field">
+            <label for="project-type">New/Replacement <span class="required" aria-hidden="true">*</span></label>
+            <select id="project-type" name="projectType" required>
+                <option value="">Select project type</option>
+                <option>New</option>
+                <option>Replacement</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="expected-close">Exp. Close <span class="required" aria-hidden="true">*</span></label>
+            <input id="expected-close" name="expectedClose" type="date" required>
+        </div>
+        <div class="field">
+            <label for="probability">Probability <span class="required" aria-hidden="true">*</span></label>
+            <select id="probability" name="probability" required>
+                <option value="">Select probability</option>
+                <option value="0">0%</option>
+                <option value="10">10%</option>
+                <option value="20">20%</option>
+                <option value="30">30%</option>
+                <option value="40">40%</option>
+                <option value="50">50%</option>
+                <option value="60">60%</option>
+                <option value="70">70%</option>
+                <option value="80">80%</option>
+                <option value="90">90%</option>
+                <option value="100">100%</option>
+            </select>
+        </div>
+        <div class="field field-wide">
+            <label for="probability-comment">Prob. comment</label>
+            <textarea id="probability-comment" name="probabilityComment"></textarea>
+        </div>
+        <div class="field">
+            <label for="bid-status">Bid Status</label>
+            <select id="bid-status" name="bidStatus">
+                <option value="">Select bid status</option>
+                <option>Not started</option>
+                <option>In progress</option>
+                <option>Submitted</option>
+                <option>Won</option>
+                <option>Lost</option>
+            </select>
+        </div>
+        <div class="field field-wide">
+            <label for="bid-status-comment">Bid Status cmt.</label>
+            <textarea id="bid-status-comment" name="bidStatusComment"></textarea>
+        </div>
+        <div class="field field-wide">
+            <label for="opportunity-number">Opportunity #</label>
+            <input id="opportunity-number" name="opportunityNumber" type="text">
+        </div>
+        <p id="form-error" role="alert" hidden></p>
+    </form>
 
-    <label>Required Capacity (MBH)</label>
-    <input id="Capacity" type="number" min="1">
-
-    <label>Refrigerant</label>
-    <select id="Refrigerant">
-        <option value="R717">R717</option>
-        <option value="R22">R22</option>
-    </select>
-
-    <label>Condensing Temperature (°F)</label>
-    <input id="Condensing Temperature" type="number">
-
-    <label>Wet Bulb Temperature (°F)</label>
-    <input id="Wet Bulb Temperature" type="number">
-
-    <label>Motor Voltage</label>
-    <select id="Motor Voltage">
-        <option value="460/3/60">460/3/60</option>
-        <option value="575/3/60">575/3/60</option>
-    </select>
-
-    <label>Upper Capacity Tolerance (%)</label>
-    <input id="Upper Tolerance" type="number" value="10" min="0" step="any">
-
-    <label>Lower Capacity Tolerance (%)</label>
-    <input id="Lower Tolerance" type="number" value="-10" min="-100" max="0" step="any">
-
-    <button onclick="findUnit()">
-        Find Unit
-    </button>
-
-    <div id="result" class="result">
-        Enter design conditions and click Find Unit.
-    </div>
-</div>
-
+    <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
+        <h2 id="unit-list-heading">Select Units</h2>
+        <div class="unit-table-wrapper">
+            <table>
+                <thead>
+                    <tr><th scope="col">#</th><th scope="col">Location</th><th scope="col">Unit Tag</th><th scope="col">Unit Type</th></tr>
+                </thead>
+                <tbody>
+                    <tr data-unit-row="1"><th scope="row">1</th><td><input data-unit-field="location" aria-label="Location for unit 1"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 1"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="2"><th scope="row">2</th><td><input data-unit-field="location" aria-label="Location for unit 2"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 2"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="3"><th scope="row">3</th><td><input data-unit-field="location" aria-label="Location for unit 3"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 3"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="4"><th scope="row">4</th><td><input data-unit-field="location" aria-label="Location for unit 4"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 4"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="5"><th scope="row">5</th><td><input data-unit-field="location" aria-label="Location for unit 5"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 5"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="6"><th scope="row">6</th><td><input data-unit-field="location" aria-label="Location for unit 6"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 6"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="7"><th scope="row">7</th><td><input data-unit-field="location" aria-label="Location for unit 7"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 7"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                    <tr data-unit-row="8"><th scope="row">8</th><td><input data-unit-field="location" aria-label="Location for unit 8"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 8"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
 <script>
+const projectForm = document.getElementById("project-form");
+const projectFields = [...projectForm.elements].filter(element => element.name);
+const formError = document.getElementById("form-error");
+const unitList = document.getElementById("unit-list");
+const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 
-const wetBulbTemperatures = [
-    50, 55, 60, 62, 64, 66, 68, 70, 72, 74, 75, 76, 77, 78, 80, 82, 84, 86
-];
-const correctionFactorRows = [
-    { condensingTemperature: 85, factors: [0.98, 1.09, 1.24, 1.34, 1.44, 1.56, 1.72, 1.9, 2.16, 2.48, 2.7, 2.94, 3.25, 3.57, null, null, null, null] },
-    { condensingTemperature: 90, factors: [0.83, 0.91, 1.02, 1.08, 1.14, 1.21, 1.29, 1.4, 1.53, 1.69, 1.79, 1.89, 2.01, 2.12, 2.54, 3.12, null, null] },
-    { condensingTemperature: 95, factors: [0.71, 0.78, 0.85, 0.89, 0.94, 0.98, 1.03, 1.09, 1.17, 1.25, 1.29, 1.34, 1.39, 1.47, 1.63, 1.85, 2.12, 2.47] },
-    { condensingTemperature: 96.3, factors: [0.69, 0.75, 0.82, 0.86, 0.9, 0.94, 0.98, 1.03, 1.1, 1.18, 1.22, 1.26, 1.31, 1.37, 1.51, 1.71, 1.94, 2.25] },
-    { condensingTemperature: 100, factors: [0.63, 0.68, 0.73, 0.76, 0.79, 0.81, 0.84, 0.87, 0.92, 0.97, 1, 1.03, 1.07, 1.11, 1.2, 1.3, 1.46, 1.63] },
-    { condensingTemperature: 105, factors: [0.56, 0.59, 0.62, 0.64, 0.67, 0.69, 0.71, 0.74, 0.78, 0.81, 0.83, 0.85, 0.87, 0.89, 0.95, 1.01, 1.1, 1.21] },
-    { condensingTemperature: 110, factors: [0.5, 0.53, 0.55, 0.57, 0.58, 0.6, 0.62, 0.63, 0.66, 0.69, 0.7, 0.71, 0.73, 0.75, 0.79, 0.83, 0.87, 0.93] }
-];
-const units = [
-    { model: "IEC-B-1012-AAB", baseHor: 3875.6, fanMotor: "2 x 3" },
-    { model: "IEC-B-1012-NAB", baseHor: 4414.3, fanMotor: "2 x 5" },
-    { model: "IEC-B-1012-PAB", baseHor: 4870.3, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1012-QAB", baseHor: 5201.8, fanMotor: "2 x 10" },
-    { model: "IEC-B-1012-NAC", baseHor: 4994.7, fanMotor: "2 x 5" },
-    { model: "IEC-B-1012-PAC", baseHor: 5512.9, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1012-QAC", baseHor: 5906.6, fanMotor: "2 x 10" },
-    { model: "IEC-B-1012-PAD", baseHor: 5595.8, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1012-QAD", baseHor: 5989.5, fanMotor: "2 x 10" },
-    { model: "IEC-B-1012-NAJ", baseHor: 5567, fanMotor: "2 x 5" },
-    { model: "IEC-B-1012-PAJ", baseHor: 5906.6, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1012-QAJ", baseHor: 6321.1, fanMotor: "2 x 10" },
-    { model: "IEC-B-1012-PAE", baseHor: 6963.6, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1012-QAE", baseHor: 6031, fanMotor: "2 x 10" },
-    { model: "IEC-B-1012-NAK", baseHor: 6466.2, fanMotor: "2 x 5" },
-    { model: "IEC-B-1012-PAK", baseHor: 5782.3, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1012-QAK", baseHor: 6362.6, fanMotor: "2 x 10" },
-    { model: "IEC-B-1012-SLJ", baseHor: 6818.5, fanMotor: "2 x 15" },
-    { model: "IEC-B-1012-SLK", baseHor: 7543.9, fanMotor: "2 x 15" },
-    { model: "IEC-B-1018-BAB", baseHor: 5947.9, fanMotor: "3 x 3" },
-    { model: "IEC-B-1018-PAB", baseHor: 6776.9, fanMotor: "3 x 5" },
-    { model: "IEC-B-1018-CAB", baseHor: 7460.8, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1018-SAB", baseHor: 7999.7, fanMotor: "3 x 10" },
-    { model: "IEC-B-1018-PAC", baseHor: 7502.5, fanMotor: "3 x 5" },
-    { model: "IEC-B-1018-CAC", baseHor: 8248.6, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1018-SAC", baseHor: 8828.9, fanMotor: "3 x 10" },
-    { model: "IEC-B-1018-CAD", baseHor: 8600.9, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1018-SAD", baseHor: 9119, fanMotor: "3 x 10" },
-    { model: "IEC-B-1018-PAJ", baseHor: 8435.1, fanMotor: "3 x 5" },
-    { model: "IEC-B-1018-CAJ", baseHor: 8953.2, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1018-SAJ", baseHor: 9616.4, fanMotor: "3 x 10" },
-    { model: "IEC-B-1018-CAE", baseHor: 10694.1, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1018-SAE", baseHor: 9243.4, fanMotor: "3 x 10" },
-    { model: "IEC-B-1018-PAK", baseHor: 9865.1, fanMotor: "3 x 5" },
-    { model: "IEC-B-1018-CAK", baseHor: 8580.2, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1018-SAK", baseHor: 9575, fanMotor: "3 x 10" },
-    { model: "IEC-B-1018-DLJ", baseHor: 10404, fanMotor: "3 x 15" },
-    { model: "IEC-B-1018-DLK", baseHor: 11460.9, fanMotor: "3 x 15" },
-    { model: "IEC-B-1212-AAB", baseHor: 4439, fanMotor: "2 x 3" },
-    { model: "IEC-B-1212-NAB", baseHor: 5027.4, fanMotor: "2 x 5" },
-    { model: "IEC-B-1212-PAB", baseHor: 5541.9, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1212-QAB", baseHor: 5939, fanMotor: "2 x 10" },
-    { model: "IEC-B-1212-NAC", baseHor: 5601, fanMotor: "2 x 5" },
-    { model: "IEC-B-1212-PAC", baseHor: 6174, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1212-QAC", baseHor: 6629.7, fanMotor: "2 x 10" },
-    { model: "IEC-B-1212-PAD", baseHor: 6445.5, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1212-QAD", baseHor: 6923.7, fanMotor: "2 x 10" },
-    { model: "IEC-B-1212-QAJ", baseHor: 7541.1, fanMotor: "2 x 10" },
-    { model: "IEC-B-1212-PAE", baseHor: 7217.7, fanMotor: "2 x 7.5" },
-    { model: "IEC-B-1212-QAE", baseHor: 7953, fanMotor: "2 x 10" },
-    { model: "IEC-B-1212-QAK", baseHor: 8526, fanMotor: "2 x 10" },
-    { model: "IEC-B-1212-SLD", baseHor: 6963.6, fanMotor: "2 x 15" },
-    { model: "IEC-B-1212-SLJ", baseHor: 7481.7, fanMotor: "2 x 15" },
-    { model: "IEC-B-1212-TLJ", baseHor: 8144.9, fanMotor: "2 x 20" },
-    { model: "IEC-B-1212-SLE", baseHor: 7894, fanMotor: "2 x 15" },
-    { model: "IEC-B-1212-SLK", baseHor: 8599.5, fanMotor: "2 x 15" },
-    { model: "IEC-B-1212-TLK", baseHor: 9202.2, fanMotor: "2 x 20" },
-    { model: "IEC-B-1218-BAB", baseHor: 7233, fanMotor: "3 x 3" },
-    { model: "IEC-B-1218-PAB", baseHor: 7732.2, fanMotor: "3 x 5" },
-    { model: "IEC-B-1218-CAB", baseHor: 8540.7, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1218-SAB", baseHor: 9158.4, fanMotor: "3 x 10" },
-    { model: "IEC-B-1218-PAC", baseHor: 8555, fanMotor: "3 x 5" },
-    { model: "IEC-B-1218-CAC", baseHor: 9437.4, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1218-SAC", baseHor: 10113.8, fanMotor: "3 x 10" },
-    { model: "IEC-B-1218-CAD", baseHor: 9761, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1218-SAD", baseHor: 10452, fanMotor: "3 x 10" },
-    { model: "IEC-B-1218-SAJ", baseHor: 11540, fanMotor: "3 x 10" },
-    { model: "IEC-B-1218-CAE", baseHor: 11025, fanMotor: "3 x 7.5" },
-    { model: "IEC-B-1218-SAE", baseHor: 12157, fanMotor: "3 x 10" },
-    { model: "IEC-B-1218-SAK", baseHor: 13039, fanMotor: "3 x 10" },
-    { model: "IEC-B-1218-DLD", baseHor: 10528.3, fanMotor: "3 x 15" },
-    { model: "IEC-B-1218-DLJ", baseHor: 11295.1, fanMotor: "3 x 15" },
-    { model: "IEC-B-1218-VLJ", baseHor: 12455.7, fanMotor: "3 x 20" },
-    { model: "IEC-B-1218-DLE", baseHor: 11937.6, fanMotor: "3 x 15" },
-    { model: "IEC-B-1218-DLK", baseHor: 13156.5, fanMotor: "3 x 15" },
-    { model: "IEC-B-1218-VLK", baseHor: 14067.9, fanMotor: "3 x 20" }
-];
-const unitSpecifications = new Map([
-    ["IEC-B-1012-AAB", { airFlowCfm: 43874, internalCoilVolume: 37.5 }],
-    ["IEC-B-1012-NAB", { airFlowCfm: 51906, internalCoilVolume: 37.5 }],
-    ["IEC-B-1012-PAB", { airFlowCfm: 58820, internalCoilVolume: 37.5 }],
-    ["IEC-B-1012-QAB", { airFlowCfm: 63996, internalCoilVolume: 37.5 }],
-    ["IEC-B-1012-NAC", { airFlowCfm: 51188, internalCoilVolume: 47 }],
-    ["IEC-B-1012-PAC", { airFlowCfm: 58478, internalCoilVolume: 47 }],
-    ["IEC-B-1012-QAC", { airFlowCfm: 63349, internalCoilVolume: 47 }],
-    ["IEC-B-1012-PAD", { airFlowCfm: 57692, internalCoilVolume: 56 }],
-    ["IEC-B-1012-QAD", { airFlowCfm: 62909, internalCoilVolume: 56 }],
-    ["IEC-B-1012-NAJ", { airFlowCfm: 49508, internalCoilVolume: 62 }],
-    ["IEC-B-1012-PAJ", { airFlowCfm: 56974, internalCoilVolume: 62 }],
-    ["IEC-B-1012-QAJ", { airFlowCfm: 62674, internalCoilVolume: 62 }],
-    ["IEC-B-1012-PAE", { airFlowCfm: 57432, internalCoilVolume: 65 }],
-    ["IEC-B-1012-QAE", { airFlowCfm: 62708, internalCoilVolume: 65 }],
-    ["IEC-B-1012-NAK", { airFlowCfm: 48767, internalCoilVolume: 72 }],
-    ["IEC-B-1012-PAK", { airFlowCfm: 56333, internalCoilVolume: 72 }],
-    ["IEC-B-1012-QAK", { airFlowCfm: 62115, internalCoilVolume: 72 }],
-    ["IEC-B-1012-SLJ", { airFlowCfm: 70364, internalCoilVolume: 62 }],
-    ["IEC-B-1012-SLK", { airFlowCfm: 69683, internalCoilVolume: 72 }],
-    ["IEC-B-1018-BAB", { airFlowCfm: 67641, internalCoilVolume: 56 }],
-    ["IEC-B-1018-PAB", { airFlowCfm: 80047, internalCoilVolume: 56 }],
-    ["IEC-B-1018-CAB", { airFlowCfm: 90209, internalCoilVolume: 56 }],
-    ["IEC-B-1018-SAB", { airFlowCfm: 97304, internalCoilVolume: 56 }],
-    ["IEC-B-1018-PAC", { airFlowCfm: 78326, internalCoilVolume: 70 }],
-    ["IEC-B-1018-CAC", { airFlowCfm: 89232, internalCoilVolume: 70 }],
-    ["IEC-B-1018-SAC", { airFlowCfm: 96962, internalCoilVolume: 70 }],
-    ["IEC-B-1018-CAD", { airFlowCfm: 88406, internalCoilVolume: 83.5 }],
-    ["IEC-B-1018-SAD", { airFlowCfm: 96240, internalCoilVolume: 83.5 }],
-    ["IEC-B-1018-PAJ", { airFlowCfm: 75544, internalCoilVolume: 93 }],
-    ["IEC-B-1018-CAJ", { airFlowCfm: 87157, internalCoilVolume: 93 }],
-    ["IEC-B-1018-SAJ", { airFlowCfm: 95837, internalCoilVolume: 93 }],
-    ["IEC-B-1018-CAE", { airFlowCfm: 87978, internalCoilVolume: 97 }],
-    ["IEC-B-1018-SAE", { airFlowCfm: 95854, internalCoilVolume: 97 }],
-    ["IEC-B-1018-PAK", { airFlowCfm: 74025, internalCoilVolume: 108 }],
-    ["IEC-B-1018-CAK", { airFlowCfm: 86119, internalCoilVolume: 108 }],
-    ["IEC-B-1018-SAK", { airFlowCfm: 94939, internalCoilVolume: 108 }],
-    ["IEC-B-1018-DLJ", { airFlowCfm: 107608, internalCoilVolume: 93 }],
-    ["IEC-B-1018-DLK", { airFlowCfm: 107220, internalCoilVolume: 108 }],
-    ["IEC-B-1212-AAB", { airFlowCfm: 48327, internalCoilVolume: 46 }],
-    ["IEC-B-1212-NAB", { airFlowCfm: 57468, internalCoilVolume: 46 }],
-    ["IEC-B-1212-PAB", { airFlowCfm: 65788, internalCoilVolume: 46 }],
-    ["IEC-B-1212-QAB", { airFlowCfm: 71823, internalCoilVolume: 46 }],
-    ["IEC-B-1212-NAC", { airFlowCfm: 56989, internalCoilVolume: 57 }],
-    ["IEC-B-1212-PAC", { airFlowCfm: 65261, internalCoilVolume: 57 }],
-    ["IEC-B-1212-QAC", { airFlowCfm: 71412, internalCoilVolume: 57 }],
-    ["IEC-B-1212-PAD", { airFlowCfm: 64811, internalCoilVolume: 69 }],
-    ["IEC-B-1212-QAD", { airFlowCfm: 71118, internalCoilVolume: 69 }],
-    ["IEC-B-1212-QAJ", { airFlowCfm: 70550, internalCoilVolume: 76 }],
-    ["IEC-B-1212-PAE", { airFlowCfm: 64434, internalCoilVolume: 80 }],
-    ["IEC-B-1212-QAE", { airFlowCfm: 70716, internalCoilVolume: 80 }],
-    ["IEC-B-1212-QAK", { airFlowCfm: 70231, internalCoilVolume: 89 }],
-    ["IEC-B-1212-SLD", { airFlowCfm: 80473, internalCoilVolume: 69 }],
-    ["IEC-B-1212-SLJ", { airFlowCfm: 79807, internalCoilVolume: 76 }],
-    ["IEC-B-1212-TLJ", { airFlowCfm: 86853, internalCoilVolume: 76 }],
-    ["IEC-B-1212-SLE", { airFlowCfm: 79797, internalCoilVolume: 80 }],
-    ["IEC-B-1212-SLK", { airFlowCfm: 79005, internalCoilVolume: 89 }],
-    ["IEC-B-1212-TLK", { airFlowCfm: 86199, internalCoilVolume: 89 }],
-    ["IEC-B-1218-BAB", { airFlowCfm: 73404, internalCoilVolume: 69 }],
-    ["IEC-B-1218-PAB", { airFlowCfm: 87035, internalCoilVolume: 69 }],
-    ["IEC-B-1218-CAB", { airFlowCfm: 99677, internalCoilVolume: 69 }],
-    ["IEC-B-1218-SAB", { airFlowCfm: 109087, internalCoilVolume: 69 }],
-    ["IEC-B-1218-PAC", { airFlowCfm: 86204, internalCoilVolume: 86 }],
-    ["IEC-B-1218-CAC", { airFlowCfm: 98802, internalCoilVolume: 86 }],
-    ["IEC-B-1218-SAC", { airFlowCfm: 108361, internalCoilVolume: 86 }],
-    ["IEC-B-1218-CAD", { airFlowCfm: 98041, internalCoilVolume: 102.5 }],
-    ["IEC-B-1218-SAD", { airFlowCfm: 107735, internalCoilVolume: 102.5 }],
-    ["IEC-B-1218-SAJ", { airFlowCfm: 106756, internalCoilVolume: 114 }],
-    ["IEC-B-1218-CAE", { airFlowCfm: 97488, internalCoilVolume: 119 }],
-    ["IEC-B-1218-SAE", { airFlowCfm: 107361, internalCoilVolume: 119 }],
-    ["IEC-B-1218-SAK", { airFlowCfm: 105967, internalCoilVolume: 132.5 }],
-    ["IEC-B-1218-DLD", { airFlowCfm: 123513, internalCoilVolume: 102.5 }],
-    ["IEC-B-1218-DLJ", { airFlowCfm: 122425, internalCoilVolume: 114 }],
-    ["IEC-B-1218-VLJ", { airFlowCfm: 133009, internalCoilVolume: 114 }],
-    ["IEC-B-1218-DLE", { airFlowCfm: 122460, internalCoilVolume: 119 }],
-    ["IEC-B-1218-DLK", { airFlowCfm: 121069, internalCoilVolume: 132.5 }],
-    ["IEC-B-1218-VLK", { airFlowCfm: 131877, internalCoilVolume: 132.5 }]
-]);
-const r717Charges = new Map([
-    ["IEC-B-1012-AAB", 384],
-    ["IEC-B-1012-NAB", 384],
-    ["IEC-B-1012-PAB", 384],
-    ["IEC-B-1012-QAB", 384],
-    ["IEC-B-1012-NAC", 478],
-    ["IEC-B-1012-PAC", 478],
-    ["IEC-B-1012-QAC", 478],
-    ["IEC-B-1012-PAD", 572],
-    ["IEC-B-1012-QAD", 572],
-    ["IEC-B-1012-NAJ", 636],
-    ["IEC-B-1012-PAJ", 636],
-    ["IEC-B-1012-QAJ", 636],
-    ["IEC-B-1012-PAE", 667],
-    ["IEC-B-1012-QAE", 667],
-    ["IEC-B-1012-NAK", 741],
-    ["IEC-B-1012-PAK", 741],
-    ["IEC-B-1012-QAK", 741],
-    ["IEC-B-1012-SLJ", 636],
-    ["IEC-B-1012-SLK", 741],
-    ["IEC-B-1018-BAB", 573],
-    ["IEC-B-1018-PAB", 573],
-    ["IEC-B-1018-CAB", 573],
-    ["IEC-B-1018-SAB", 573],
-    ["IEC-B-1018-PAC", 714],
-    ["IEC-B-1018-CAC", 714],
-    ["IEC-B-1018-SAC", 714],
-    ["IEC-B-1018-CAD", 855],
-    ["IEC-B-1018-SAD", 855],
-    ["IEC-B-1018-PAJ", 951],
-    ["IEC-B-1018-CAJ", 951],
-    ["IEC-B-1018-SAJ", 951],
-    ["IEC-B-1018-CAE", 996],
-    ["IEC-B-1018-SAE", 996],
-    ["IEC-B-1018-PAK", 1108],
-    ["IEC-B-1018-CAK", 1108],
-    ["IEC-B-1018-SAK", 1108],
-    ["IEC-B-1018-DLJ", 951],
-    ["IEC-B-1018-DLK", 1108],
-    ["IEC-B-1212-AAB", 472],
-    ["IEC-B-1212-NAB", 472],
-    ["IEC-B-1212-PAB", 472],
-    ["IEC-B-1212-QAB", 472],
-    ["IEC-B-1212-NAC", 587],
-    ["IEC-B-1212-PAC", 587],
-    ["IEC-B-1212-QAC", 587],
-    ["IEC-B-1212-PAD", 703],
-    ["IEC-B-1212-QAD", 703],
-    ["IEC-B-1212-QAJ", 779],
-    ["IEC-B-1212-PAE", 818],
-    ["IEC-B-1212-QAE", 818],
-    ["IEC-B-1212-QAK", 907],
-    ["IEC-B-1212-SLD", 703],
-    ["IEC-B-1212-SLJ", 779],
-    ["IEC-B-1212-TLJ", 779],
-    ["IEC-B-1212-SLE", 818],
-    ["IEC-B-1212-SLK", 907],
-    ["IEC-B-1212-TLK", 907],
-    ["IEC-B-1218-BAB", 703],
-    ["IEC-B-1218-PAB", 703],
-    ["IEC-B-1218-CAB", 703],
-    ["IEC-B-1218-SAB", 703],
-    ["IEC-B-1218-PAC", 883],
-    ["IEC-B-1218-CAC", 883],
-    ["IEC-B-1218-SAC", 883],
-    ["IEC-B-1218-CAD", 1049],
-    ["IEC-B-1218-SAD", 1049],
-    ["IEC-B-1218-SAJ", 1165],
-    ["IEC-B-1218-CAE", 1223],
-    ["IEC-B-1218-SAE", 1223],
-    ["IEC-B-1218-SAK", 1357],
-    ["IEC-B-1218-DLD", 1049],
-    ["IEC-B-1218-DLJ", 1165],
-    ["IEC-B-1218-VLJ", 1165],
-    ["IEC-B-1218-DLE", 1223],
-    ["IEC-B-1218-DLK", 1357],
-    ["IEC-B-1218-VLK", 1357]
-]);
+function getProjectData() {
+    return Object.fromEntries(new FormData(projectForm).entries());
+}
 
-function interpolateFromPoints(points, value) {
-    let lowerIndex = 0;
-    const upperIndex = points.findIndex(point => point.x >= value);
+function getUnitData() {
+    return unitRows.map(row => ({
+        location: row.querySelector('[data-unit-field="location"]').value,
+        tag: row.querySelector('[data-unit-field="tag"]').value
+    }));
+}
 
-    if (upperIndex === -1) {
-        lowerIndex = points.length - 2;
-    } else if (upperIndex > 0) {
-        lowerIndex = upperIndex - 1;
+function saveProjectData() {
+    try {
+        sessionStorage.setItem("selectsgs-project", JSON.stringify(getProjectData()));
+        sessionStorage.setItem("selectsgs-unit-rows", JSON.stringify(getUnitData()));
+        formError.hidden = true;
+        return true;
+    } catch (error) {
+        formError.textContent = "Project information could not be saved in this browser. Check your browser storage settings and try again.";
+        formError.hidden = false;
+        console.error("Could not save project information.", error);
+        return false;
     }
-
-    const lower = points[lowerIndex];
-    const upper = points[lowerIndex + 1];
-    const proportion = (value - lower.x) / (upper.x - lower.x);
-    return lower.y + proportion * (upper.y - lower.y);
 }
 
-function getCorrectionFactor(condensingTemperature, wetBulbTemperature) {
-    const factorsByCondensingTemperature = correctionFactorRows.map(row => {
-        const points = row.factors
-            .map((factor, index) => ({ x: wetBulbTemperatures[index], y: factor }))
-            .filter(point => point.y !== null);
-        return {
-            x: row.condensingTemperature,
-            y: interpolateFromPoints(points, wetBulbTemperature)
-        };
-    });
-
-    return interpolateFromPoints(factorsByCondensingTemperature, condensingTemperature);
+function updateUnitList() {
+    unitList.hidden = !projectForm.checkValidity();
 }
 
-let matchingUnits = [];
-let sortKey = "capacityPercent";
-let sortDirection = "asc";
-let currentResultDetails;
-
-const resultColumns = [
-    { key: "model", label: "Model", type: "string" },
-    { key: "capacityPercent", label: "Capacity", unit: "%", type: "number" },
-    { key: "baseHor", label: "Base HOR", unit: "MBH", type: "number" },
-    { key: "correctedHor", label: "Corrected HOR", unit: "MBH", type: "number" },
-    { key: "airFlowCfm", label: "Air Flow", unit: "CFM", type: "number" },
-    { key: "fanMotor", label: "Fan Motor", unit: "HP", type: "string" },
-    { key: "internalCoilVolume", label: "Internal Coil Volume", unit: "ft^3", type: "number" },
-    { key: "r717ChargeLb", label: "R717 Charge", unit: "lb", type: "number" }
-];
-
-function renderMatchingUnits(result) {
-    const { minimumCapacity, maximumCapacity, correctionFactor } = currentResultDetails;
-    const column = resultColumns.find(item => item.key === sortKey);
-    const directionMultiplier = sortDirection === "asc" ? 1 : -1;
-    const sortedUnits = [...matchingUnits].sort((a, b) => {
-        const aValue = a[sortKey];
-        const bValue = b[sortKey];
-
-        if (aValue == null || bValue == null) {
-            return aValue == null ? (bValue == null ? 0 : 1) : -1;
+try {
+    const savedProject = sessionStorage.getItem("selectsgs-project");
+    if (savedProject) {
+        const project = JSON.parse(savedProject);
+        for (const field of projectFields) {
+            if (Object.hasOwn(project, field.name)) {
+                field.value = project[field.name];
+            }
         }
+    }
 
-        const comparison = column.type === "number"
-            ? aValue - bValue
-            : String(aValue).localeCompare(String(bValue), undefined, { numeric: true });
-        return comparison * directionMultiplier;
+    const savedUnitRows = sessionStorage.getItem("selectsgs-unit-rows");
+    if (savedUnitRows) {
+        const unitData = JSON.parse(savedUnitRows);
+        if (Array.isArray(unitData)) {
+            unitRows.forEach((row, index) => {
+                const savedRow = unitData[index];
+                if (!savedRow || typeof savedRow !== "object") return;
+                row.querySelector('[data-unit-field="location"]').value = savedRow.location ?? "";
+                row.querySelector('[data-unit-field="tag"]').value = savedRow.tag ?? "";
+            });
+        }
+    }
+} catch (error) {
+    formError.textContent = "Saved project information could not be loaded. You can still enter the details again.";
+    formError.hidden = false;
+    console.error("Could not load saved project information.", error);
+}
+
+for (const field of projectFields) {
+    field.addEventListener("input", () => {
+        saveProjectData();
+        updateUnitList();
     });
-
-    result.innerHTML = `
-        <h3>Matching Units</h3>
-        <p>Capacity range: ${minimumCapacity.toLocaleString()}–${maximumCapacity.toLocaleString()} BTUH</p>
-        <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
-        ${sortedUnits.length
-            ? `<table>
-                <thead><tr>${resultColumns.map(item => {
-                    const isSorted = item.key === sortKey;
-                    const heading = item.unit
-                        ? `${item.label}<br><span class="table-unit">(${item.unit})</span>`
-                        : item.label;
-                    const indicator = isSorted ? (sortDirection === "asc" ? " ▲" : " ▼") : "";
-                    return `<th scope="col" aria-sort="${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button type="button" data-sort-key="${item.key}" aria-label="Sort by ${item.label}, ${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "ascending"}">${heading}${indicator}</button></th>`;
-                }).join("")}</tr></thead>
-                <tbody>${sortedUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
-                ).join("")}</tbody>
-            </table>`
-            : "<p>No units match the selected capacity range.</p>"}
-    `;
+    field.addEventListener("change", () => {
+        saveProjectData();
+        updateUnitList();
+    });
 }
 
-document.getElementById("result").addEventListener("click", event => {
-    const button = event.target.closest("button[data-sort-key]");
-    if (!button) return;
-
-    const selectedKey = button.dataset.sortKey;
-    if (selectedKey === sortKey) {
-        sortDirection = sortDirection === "asc" ? "desc" : "asc";
-    } else {
-        sortKey = selectedKey;
-        sortDirection = "asc";
+for (const row of unitRows) {
+    for (const field of row.querySelectorAll("[data-unit-field]")) {
+        field.addEventListener("input", saveProjectData);
+        field.addEventListener("change", saveProjectData);
     }
 
-    renderMatchingUnits(document.getElementById("result"));
-});
+    row.querySelector(".select-unit").addEventListener("click", () => {
+        if (!projectForm.checkValidity()) {
+            updateUnitList();
+            return;
+        }
+        if (!saveProjectData()) return;
 
-function findUnit() {
-
-    const capacity = Number(document.getElementById("Capacity").value);
-    const condensingTemperatureInput = document.getElementById("Condensing Temperature").value;
-    const wetBulbTemperatureInput = document.getElementById("Wet Bulb Temperature").value;
-    const condensingTemperature = Number(condensingTemperatureInput);
-    const wetBulbTemperature = Number(wetBulbTemperatureInput);
-    const lowerTolerance = Number(document.getElementById("Lower Tolerance").value);
-    const upperTolerance = Number(document.getElementById("Upper Tolerance").value);
-    const result = document.getElementById("result");
-
-    if (!Number.isFinite(capacity) || capacity <= 0 ||
-        condensingTemperatureInput.trim() === "" || !Number.isFinite(condensingTemperature) ||
-        wetBulbTemperatureInput.trim() === "" || !Number.isFinite(wetBulbTemperature) ||
-        !Number.isFinite(lowerTolerance) || !Number.isFinite(upperTolerance) ||
-        lowerTolerance < -100 || lowerTolerance > 0 ||
-        upperTolerance < 0 || lowerTolerance > upperTolerance) {
-        result.textContent =
-            "Enter a capacity greater than zero, valid CT and WB values, a lower tolerance from -100% to 0%, and a nonnegative upper tolerance.";
-        return;
-    }
-
-    const correctionFactor = getCorrectionFactor(condensingTemperature, wetBulbTemperature);
-    const minimumCapacity = capacity * (1 + lowerTolerance / 100);
-    const maximumCapacity = capacity * (1 + upperTolerance / 100);
-    matchingUnits = units
-        .map(unit => {
-            const correctedHor = unit.baseHor / correctionFactor;
-            const correctedCapacity = correctedHor;
-            return {
-                ...unit,
-                ...unitSpecifications.get(unit.model),
-                r717ChargeLb: r717Charges.get(unit.model),
-                correctedHor,
-                capacityPercent: correctedCapacity / capacity * 100
-            };
-        })
-        .filter(unit =>
-            unit.correctedHor >= minimumCapacity &&
-            unit.correctedHor <= maximumCapacity
-        );
-
-    sortKey = "capacityPercent";
-    sortDirection = "asc";
-    currentResultDetails = { minimumCapacity, maximumCapacity, correctionFactor };
-    renderMatchingUnits(result);
+        const unitNumber = row.dataset.unitRow;
+        window.location.href = `unit-selection.html?unit=${unitNumber}`;
+    });
 }
 
+updateUnitList();
 </script>
-
 </body>
 </html>

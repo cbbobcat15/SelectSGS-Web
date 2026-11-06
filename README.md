@@ -19,3 +19,7 @@ Create a modern web-based configurator, pricing, and quoting platform for SGS Pr
     Condensers - IEC & DTC
     Evaporators - PC, DT/DTX, BTR, STC, CF, FL
     Slab Coils
+
+**Current workflow**
+
+Open `index.html` to enter project information. Once the required details are complete, an eight-row unit list appears; each “Click to Select” button opens `unit-selection.html` for that row. Project and row details are carried between these pages in the current browser tab.
