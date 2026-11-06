@@ -61,7 +61,7 @@
 <div class="container">
     <h1>SelectSGS Web</h1>
 
-    <label>Required Capacity (BTUH; 1 MBH = 1,000 BTUH)</label>
+    <label>Required Capacity (MBH)</label>
     <input id="Capacity" type="number" min="1">
 
     <label>Lower Capacity Tolerance (%)</label>
@@ -248,7 +248,7 @@ function findUnit() {
     const matchingUnits = units
         .map(unit => {
             const correctedHor = unit.baseHor / correctionFactor;
-            const correctedCapacity = correctedHor * 1000;
+            const correctedCapacity = correctedHor;
             return {
                 ...unit,
                 correctedHor,
@@ -256,8 +256,8 @@ function findUnit() {
             };
         })
         .filter(unit =>
-            unit.correctedHor * 1000 >= minimumCapacity &&
-            unit.correctedHor * 1000 <= maximumCapacity
+            unit.correctedHor >= minimumCapacity &&
+            unit.correctedHor <= maximumCapacity
         )
         .sort((a, b) => a.capacityPercent - b.capacityPercent);
 
