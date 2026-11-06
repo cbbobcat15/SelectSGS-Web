@@ -189,6 +189,84 @@ const units = [
     { model: "IEC-B-1218-DLK", baseHor: 13156.5, fanMotor: "3 x 15" },
     { model: "IEC-B-1218-VLK", baseHor: 14067.9, fanMotor: "3 x 20" }
 ];
+const unitSpecifications = new Map([
+    ["IEC-B-1012-AAB", { airFlowCfm: 43874, internalCoilVolume: 37.5 }],
+    ["IEC-B-1012-NAB", { airFlowCfm: 51906, internalCoilVolume: 37.5 }],
+    ["IEC-B-1012-PAB", { airFlowCfm: 58820, internalCoilVolume: 37.5 }],
+    ["IEC-B-1012-QAB", { airFlowCfm: 63996, internalCoilVolume: 37.5 }],
+    ["IEC-B-1012-NAC", { airFlowCfm: 51188, internalCoilVolume: 47 }],
+    ["IEC-B-1012-PAC", { airFlowCfm: 58478, internalCoilVolume: 47 }],
+    ["IEC-B-1012-QAC", { airFlowCfm: 63349, internalCoilVolume: 47 }],
+    ["IEC-B-1012-PAD", { airFlowCfm: 57692, internalCoilVolume: 56 }],
+    ["IEC-B-1012-QAD", { airFlowCfm: 62909, internalCoilVolume: 56 }],
+    ["IEC-B-1012-NAJ", { airFlowCfm: 49508, internalCoilVolume: 62 }],
+    ["IEC-B-1012-PAJ", { airFlowCfm: 56974, internalCoilVolume: 62 }],
+    ["IEC-B-1012-QAJ", { airFlowCfm: 62674, internalCoilVolume: 62 }],
+    ["IEC-B-1012-PAE", { airFlowCfm: 57432, internalCoilVolume: 65 }],
+    ["IEC-B-1012-QAE", { airFlowCfm: 62708, internalCoilVolume: 65 }],
+    ["IEC-B-1012-NAK", { airFlowCfm: 48767, internalCoilVolume: 72 }],
+    ["IEC-B-1012-PAK", { airFlowCfm: 56333, internalCoilVolume: 72 }],
+    ["IEC-B-1012-QAK", { airFlowCfm: 62115, internalCoilVolume: 72 }],
+    ["IEC-B-1012-SLJ", { airFlowCfm: 70364, internalCoilVolume: 62 }],
+    ["IEC-B-1012-SLK", { airFlowCfm: 69683, internalCoilVolume: 72 }],
+    ["IEC-B-1018-BAB", { airFlowCfm: 67641, internalCoilVolume: 56 }],
+    ["IEC-B-1018-PAB", { airFlowCfm: 80047, internalCoilVolume: 56 }],
+    ["IEC-B-1018-CAB", { airFlowCfm: 90209, internalCoilVolume: 56 }],
+    ["IEC-B-1018-SAB", { airFlowCfm: 97304, internalCoilVolume: 56 }],
+    ["IEC-B-1018-PAC", { airFlowCfm: 78326, internalCoilVolume: 70 }],
+    ["IEC-B-1018-CAC", { airFlowCfm: 89232, internalCoilVolume: 70 }],
+    ["IEC-B-1018-SAC", { airFlowCfm: 96962, internalCoilVolume: 70 }],
+    ["IEC-B-1018-CAD", { airFlowCfm: 88406, internalCoilVolume: 83.5 }],
+    ["IEC-B-1018-SAD", { airFlowCfm: 96240, internalCoilVolume: 83.5 }],
+    ["IEC-B-1018-PAJ", { airFlowCfm: 75544, internalCoilVolume: 93 }],
+    ["IEC-B-1018-CAJ", { airFlowCfm: 87157, internalCoilVolume: 93 }],
+    ["IEC-B-1018-SAJ", { airFlowCfm: 95837, internalCoilVolume: 93 }],
+    ["IEC-B-1018-CAE", { airFlowCfm: 87978, internalCoilVolume: 97 }],
+    ["IEC-B-1018-SAE", { airFlowCfm: 95854, internalCoilVolume: 97 }],
+    ["IEC-B-1018-PAK", { airFlowCfm: 74025, internalCoilVolume: 108 }],
+    ["IEC-B-1018-CAK", { airFlowCfm: 86119, internalCoilVolume: 108 }],
+    ["IEC-B-1018-SAK", { airFlowCfm: 94939, internalCoilVolume: 108 }],
+    ["IEC-B-1018-DLJ", { airFlowCfm: 107608, internalCoilVolume: 93 }],
+    ["IEC-B-1018-DLK", { airFlowCfm: 107220, internalCoilVolume: 108 }],
+    ["IEC-B-1212-AAB", { airFlowCfm: 48327, internalCoilVolume: 46 }],
+    ["IEC-B-1212-NAB", { airFlowCfm: 57468, internalCoilVolume: 46 }],
+    ["IEC-B-1212-PAB", { airFlowCfm: 65788, internalCoilVolume: 46 }],
+    ["IEC-B-1212-QAB", { airFlowCfm: 71823, internalCoilVolume: 46 }],
+    ["IEC-B-1212-NAC", { airFlowCfm: 56989, internalCoilVolume: 57 }],
+    ["IEC-B-1212-PAC", { airFlowCfm: 65261, internalCoilVolume: 57 }],
+    ["IEC-B-1212-QAC", { airFlowCfm: 71412, internalCoilVolume: 57 }],
+    ["IEC-B-1212-PAD", { airFlowCfm: 64811, internalCoilVolume: 69 }],
+    ["IEC-B-1212-QAD", { airFlowCfm: 71118, internalCoilVolume: 69 }],
+    ["IEC-B-1212-QAJ", { airFlowCfm: 70550, internalCoilVolume: 76 }],
+    ["IEC-B-1212-PAE", { airFlowCfm: 64434, internalCoilVolume: 80 }],
+    ["IEC-B-1212-QAE", { airFlowCfm: 70716, internalCoilVolume: 80 }],
+    ["IEC-B-1212-QAK", { airFlowCfm: 70231, internalCoilVolume: 89 }],
+    ["IEC-B-1212-SLD", { airFlowCfm: 80473, internalCoilVolume: 69 }],
+    ["IEC-B-1212-SLJ", { airFlowCfm: 79807, internalCoilVolume: 76 }],
+    ["IEC-B-1212-TLJ", { airFlowCfm: 86853, internalCoilVolume: 76 }],
+    ["IEC-B-1212-SLE", { airFlowCfm: 79797, internalCoilVolume: 80 }],
+    ["IEC-B-1212-SLK", { airFlowCfm: 79005, internalCoilVolume: 89 }],
+    ["IEC-B-1212-TLK", { airFlowCfm: 86199, internalCoilVolume: 89 }],
+    ["IEC-B-1218-BAB", { airFlowCfm: 73404, internalCoilVolume: 69 }],
+    ["IEC-B-1218-PAB", { airFlowCfm: 87035, internalCoilVolume: 69 }],
+    ["IEC-B-1218-CAB", { airFlowCfm: 99677, internalCoilVolume: 69 }],
+    ["IEC-B-1218-SAB", { airFlowCfm: 109087, internalCoilVolume: 69 }],
+    ["IEC-B-1218-PAC", { airFlowCfm: 86204, internalCoilVolume: 86 }],
+    ["IEC-B-1218-CAC", { airFlowCfm: 98802, internalCoilVolume: 86 }],
+    ["IEC-B-1218-SAC", { airFlowCfm: 108361, internalCoilVolume: 86 }],
+    ["IEC-B-1218-CAD", { airFlowCfm: 98041, internalCoilVolume: 102.5 }],
+    ["IEC-B-1218-SAD", { airFlowCfm: 107735, internalCoilVolume: 102.5 }],
+    ["IEC-B-1218-SAJ", { airFlowCfm: 106756, internalCoilVolume: 114 }],
+    ["IEC-B-1218-CAE", { airFlowCfm: 97488, internalCoilVolume: 119 }],
+    ["IEC-B-1218-SAE", { airFlowCfm: 107361, internalCoilVolume: 119 }],
+    ["IEC-B-1218-SAK", { airFlowCfm: 105967, internalCoilVolume: 132.5 }],
+    ["IEC-B-1218-DLD", { airFlowCfm: 123513, internalCoilVolume: 102.5 }],
+    ["IEC-B-1218-DLJ", { airFlowCfm: 122425, internalCoilVolume: 114 }],
+    ["IEC-B-1218-VLJ", { airFlowCfm: 133009, internalCoilVolume: 114 }],
+    ["IEC-B-1218-DLE", { airFlowCfm: 122460, internalCoilVolume: 119 }],
+    ["IEC-B-1218-DLK", { airFlowCfm: 121069, internalCoilVolume: 132.5 }],
+    ["IEC-B-1218-VLK", { airFlowCfm: 131877, internalCoilVolume: 132.5 }]
+]);
 
 function interpolateFromPoints(points, value) {
     let lowerIndex = 0;
@@ -251,6 +329,7 @@ function findUnit() {
             const correctedCapacity = correctedHor;
             return {
                 ...unit,
+                ...unitSpecifications.get(unit.model),
                 correctedHor,
                 capacityPercent: correctedCapacity / capacity * 100
             };
@@ -267,9 +346,9 @@ function findUnit() {
         <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
         ${matchingUnits.length
             ? `<table>
-                <thead><tr><th>Model</th><th>Fan Motor (hp)</th><th>Base HOR (MBH)</th><th>Corrected HOR (MBH)</th><th>Capacity (%)</th></tr></thead>
+                <thead><tr><th>Model</th><th>Fan Motor (hp)</th><th>Air Flow (CFM)</th><th>Internal Coil Volume (ft^3)</th><th>Base HOR (MBH)</th><th>Corrected HOR (MBH)</th><th>Capacity (%)</th></tr></thead>
                 <tbody>${matchingUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.fanMotor}</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.capacityPercent.toFixed(1)}%</td></tr>`
+                    `<tr><td>${unit.model}</td><td>${unit.fanMotor}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.capacityPercent.toFixed(1)}%</td></tr>`
                 ).join("")}</tbody>
             </table>`
             : "<p>No units match the selected capacity range.</p>"}
