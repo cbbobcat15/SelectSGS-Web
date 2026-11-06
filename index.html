@@ -267,6 +267,84 @@ const unitSpecifications = new Map([
     ["IEC-B-1218-DLK", { airFlowCfm: 121069, internalCoilVolume: 132.5 }],
     ["IEC-B-1218-VLK", { airFlowCfm: 131877, internalCoilVolume: 132.5 }]
 ]);
+const r717Charges = new Map([
+    ["IEC-B-1012-AAB", 384],
+    ["IEC-B-1012-NAB", 384],
+    ["IEC-B-1012-PAB", 384],
+    ["IEC-B-1012-QAB", 384],
+    ["IEC-B-1012-NAC", 478],
+    ["IEC-B-1012-PAC", 478],
+    ["IEC-B-1012-QAC", 478],
+    ["IEC-B-1012-PAD", 572],
+    ["IEC-B-1012-QAD", 572],
+    ["IEC-B-1012-NAJ", 636],
+    ["IEC-B-1012-PAJ", 636],
+    ["IEC-B-1012-QAJ", 636],
+    ["IEC-B-1012-PAE", 667],
+    ["IEC-B-1012-QAE", 667],
+    ["IEC-B-1012-NAK", 741],
+    ["IEC-B-1012-PAK", 741],
+    ["IEC-B-1012-QAK", 741],
+    ["IEC-B-1012-SLJ", 636],
+    ["IEC-B-1012-SLK", 741],
+    ["IEC-B-1018-BAB", 573],
+    ["IEC-B-1018-PAB", 573],
+    ["IEC-B-1018-CAB", 573],
+    ["IEC-B-1018-SAB", 573],
+    ["IEC-B-1018-PAC", 714],
+    ["IEC-B-1018-CAC", 714],
+    ["IEC-B-1018-SAC", 714],
+    ["IEC-B-1018-CAD", 855],
+    ["IEC-B-1018-SAD", 855],
+    ["IEC-B-1018-PAJ", 951],
+    ["IEC-B-1018-CAJ", 951],
+    ["IEC-B-1018-SAJ", 951],
+    ["IEC-B-1018-CAE", 996],
+    ["IEC-B-1018-SAE", 996],
+    ["IEC-B-1018-PAK", 1108],
+    ["IEC-B-1018-CAK", 1108],
+    ["IEC-B-1018-SAK", 1108],
+    ["IEC-B-1018-DLJ", 951],
+    ["IEC-B-1018-DLK", 1108],
+    ["IEC-B-1212-AAB", 472],
+    ["IEC-B-1212-NAB", 472],
+    ["IEC-B-1212-PAB", 472],
+    ["IEC-B-1212-QAB", 472],
+    ["IEC-B-1212-NAC", 587],
+    ["IEC-B-1212-PAC", 587],
+    ["IEC-B-1212-QAC", 587],
+    ["IEC-B-1212-PAD", 703],
+    ["IEC-B-1212-QAD", 703],
+    ["IEC-B-1212-QAJ", 779],
+    ["IEC-B-1212-PAE", 818],
+    ["IEC-B-1212-QAE", 818],
+    ["IEC-B-1212-QAK", 907],
+    ["IEC-B-1212-SLD", 703],
+    ["IEC-B-1212-SLJ", 779],
+    ["IEC-B-1212-TLJ", 779],
+    ["IEC-B-1212-SLE", 818],
+    ["IEC-B-1212-SLK", 907],
+    ["IEC-B-1212-TLK", 907],
+    ["IEC-B-1218-BAB", 703],
+    ["IEC-B-1218-PAB", 703],
+    ["IEC-B-1218-CAB", 703],
+    ["IEC-B-1218-SAB", 703],
+    ["IEC-B-1218-PAC", 883],
+    ["IEC-B-1218-CAC", 883],
+    ["IEC-B-1218-SAC", 883],
+    ["IEC-B-1218-CAD", 1049],
+    ["IEC-B-1218-SAD", 1049],
+    ["IEC-B-1218-SAJ", 1165],
+    ["IEC-B-1218-CAE", 1223],
+    ["IEC-B-1218-SAE", 1223],
+    ["IEC-B-1218-SAK", 1357],
+    ["IEC-B-1218-DLD", 1049],
+    ["IEC-B-1218-DLJ", 1165],
+    ["IEC-B-1218-VLJ", 1165],
+    ["IEC-B-1218-DLE", 1223],
+    ["IEC-B-1218-DLK", 1357],
+    ["IEC-B-1218-VLK", 1357]
+]);
 
 function interpolateFromPoints(points, value) {
     let lowerIndex = 0;
@@ -330,6 +408,7 @@ function findUnit() {
             return {
                 ...unit,
                 ...unitSpecifications.get(unit.model),
+                r717ChargeLb: r717Charges.get(unit.model),
                 correctedHor,
                 capacityPercent: correctedCapacity / capacity * 100
             };
@@ -346,9 +425,9 @@ function findUnit() {
         <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
         ${matchingUnits.length
             ? `<table>
-                <thead><tr><th>Model</th><th>Fan Motor (hp)</th><th>Air Flow (CFM)</th><th>Internal Coil Volume (ft^3)</th><th>Base HOR (MBH)</th><th>Corrected HOR (MBH)</th><th>Capacity (%)</th></tr></thead>
+                <thead><tr><th>Model</th><th>Fan Motor (hp)</th><th>Air Flow (CFM)</th><th>Internal Coil Volume (ft^3)</th><th>R717 Charge (lb)</th><th>Base HOR (MBH)</th><th>Corrected HOR (MBH)</th><th>Capacity (%)</th></tr></thead>
                 <tbody>${matchingUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.fanMotor}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.capacityPercent.toFixed(1)}%</td></tr>`
+                    `<tr><td>${unit.model}</td><td>${unit.fanMotor}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.capacityPercent.toFixed(1)}%</td></tr>`
                 ).join("")}</tbody>
             </table>`
             : "<p>No units match the selected capacity range.</p>"}
