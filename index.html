@@ -82,6 +82,23 @@
             font-size: calc(1em + 2pt);
         }
 
+        thead th button {
+            display: inline;
+            width: auto;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        thead th button:hover {
+            background: transparent;
+            text-decoration: underline;
+        }
+
         th:first-child,
         td:first-child {
             text-align: left;
@@ -424,6 +441,77 @@ function getCorrectionFactor(condensingTemperature, wetBulbTemperature) {
     return interpolateFromPoints(factorsByCondensingTemperature, condensingTemperature);
 }
 
+let matchingUnits = [];
+let sortKey = "capacityPercent";
+let sortDirection = "asc";
+let currentResultDetails;
+
+const resultColumns = [
+    { key: "model", label: "Model", type: "string" },
+    { key: "capacityPercent", label: "Capacity", unit: "%", type: "number" },
+    { key: "baseHor", label: "Base HOR", unit: "MBH", type: "number" },
+    { key: "correctedHor", label: "Corrected HOR", unit: "MBH", type: "number" },
+    { key: "airFlowCfm", label: "Air Flow", unit: "CFM", type: "number" },
+    { key: "fanMotor", label: "Fan Motor", unit: "HP", type: "string" },
+    { key: "internalCoilVolume", label: "Internal Coil Volume", unit: "ft^3", type: "number" },
+    { key: "r717ChargeLb", label: "R717 Charge", unit: "lb", type: "number" }
+];
+
+function renderMatchingUnits(result) {
+    const { minimumCapacity, maximumCapacity, correctionFactor } = currentResultDetails;
+    const column = resultColumns.find(item => item.key === sortKey);
+    const directionMultiplier = sortDirection === "asc" ? 1 : -1;
+    const sortedUnits = [...matchingUnits].sort((a, b) => {
+        const aValue = a[sortKey];
+        const bValue = b[sortKey];
+
+        if (aValue == null || bValue == null) {
+            return aValue == null ? (bValue == null ? 0 : 1) : -1;
+        }
+
+        const comparison = column.type === "number"
+            ? aValue - bValue
+            : String(aValue).localeCompare(String(bValue), undefined, { numeric: true });
+        return comparison * directionMultiplier;
+    });
+
+    result.innerHTML = `
+        <h3>Matching Units</h3>
+        <p>Capacity range: ${minimumCapacity.toLocaleString()}–${maximumCapacity.toLocaleString()} BTUH</p>
+        <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
+        ${sortedUnits.length
+            ? `<table>
+                <thead><tr>${resultColumns.map(item => {
+                    const isSorted = item.key === sortKey;
+                    const heading = item.unit
+                        ? `${item.label}<br><span class="table-unit">(${item.unit})</span>`
+                        : item.label;
+                    const indicator = isSorted ? (sortDirection === "asc" ? " ▲" : " ▼") : "";
+                    return `<th scope="col" aria-sort="${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button type="button" data-sort-key="${item.key}" aria-label="Sort by ${item.label}, ${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "ascending"}">${heading}${indicator}</button></th>`;
+                }).join("")}</tr></thead>
+                <tbody>${sortedUnits.map(unit =>
+                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
+                ).join("")}</tbody>
+            </table>`
+            : "<p>No units match the selected capacity range.</p>"}
+    `;
+}
+
+document.getElementById("result").addEventListener("click", event => {
+    const button = event.target.closest("button[data-sort-key]");
+    if (!button) return;
+
+    const selectedKey = button.dataset.sortKey;
+    if (selectedKey === sortKey) {
+        sortDirection = sortDirection === "asc" ? "desc" : "asc";
+    } else {
+        sortKey = selectedKey;
+        sortDirection = "asc";
+    }
+
+    renderMatchingUnits(document.getElementById("result"));
+});
+
 function findUnit() {
 
     const capacity = Number(document.getElementById("Capacity").value);
@@ -449,7 +537,7 @@ function findUnit() {
     const correctionFactor = getCorrectionFactor(condensingTemperature, wetBulbTemperature);
     const minimumCapacity = capacity * (1 + lowerTolerance / 100);
     const maximumCapacity = capacity * (1 + upperTolerance / 100);
-    const matchingUnits = units
+    matchingUnits = units
         .map(unit => {
             const correctedHor = unit.baseHor / correctionFactor;
             const correctedCapacity = correctedHor;
@@ -464,22 +552,12 @@ function findUnit() {
         .filter(unit =>
             unit.correctedHor >= minimumCapacity &&
             unit.correctedHor <= maximumCapacity
-        )
-        .sort((a, b) => a.capacityPercent - b.capacityPercent);
+        );
 
-    result.innerHTML = `
-        <h3>Matching Units</h3>
-        <p>Capacity range: ${minimumCapacity.toLocaleString()}–${maximumCapacity.toLocaleString()} BTUH</p>
-        <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
-        ${matchingUnits.length
-            ? `<table>
-                <thead><tr><th>Model</th><th>Capacity<br><span class="table-unit">(%)</span></th><th>Base HOR<br><span class="table-unit">(MBH)</span></th><th>Corrected HOR<br><span class="table-unit">(MBH)</span></th><th>Air Flow<br><span class="table-unit">(CFM)</span></th><th>Fan Motor<br><span class="table-unit">(HP)</span></th><th>Internal Coil Volume<br><span class="table-unit">(ft^3)</span></th><th>R717 Charge<br><span class="table-unit">(lb)</span></th></tr></thead>
-                <tbody>${matchingUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
-                ).join("")}</tbody>
-            </table>`
-            : "<p>No units match the selected capacity range.</p>"}
-    `;
+    sortKey = "capacityPercent";
+    sortDirection = "asc";
+    currentResultDetails = { minimumCapacity, maximumCapacity, correctionFactor };
+    renderMatchingUnits(result);
 }
 
 </script>
