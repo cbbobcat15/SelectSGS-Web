@@ -4,14 +4,19 @@
     <title>SelectSGS Web</title>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f6f8;
-            margin: 40px;
+            margin: 0;
+            padding: 24px;
         }
 
         .container {
-            max-width: 700px;
+            width: 100%;
             background: white;
             padding: 30px;
             border-radius: 10px;
@@ -52,6 +57,40 @@
             padding: 20px;
             background-color: #eef5ff;
             border-left: 5px solid #004f9f;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border-top: 1px solid #9aa8b5;
+            border-bottom: 1px solid #9aa8b5;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        .table-unit {
+            display: block;
+            font-weight: normal;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+
+            .container {
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -425,9 +464,9 @@ function findUnit() {
         <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
         ${matchingUnits.length
             ? `<table>
-                <thead><tr><th>Model</th><th>Fan Motor (hp)</th><th>Air Flow (CFM)</th><th>Internal Coil Volume (ft^3)</th><th>R717 Charge (lb)</th><th>Base HOR (MBH)</th><th>Corrected HOR (MBH)</th><th>Capacity (%)</th></tr></thead>
+                <thead><tr><th>Model</th><th>Capacity<br><span class="table-unit">(%)</span></th><th>Base HOR<br><span class="table-unit">(MBH)</span></th><th>Corrected HOR<br><span class="table-unit">(MBH)</span></th><th>Air Flow<br><span class="table-unit">(CFM)</span></th><th>Fan Motor<br><span class="table-unit">(HP)</span></th><th>Internal Coil Volume<br><span class="table-unit">(ft^3)</span></th><th>R717 Charge<br><span class="table-unit">(lb)</span></th></tr></thead>
                 <tbody>${matchingUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.fanMotor}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.capacityPercent.toFixed(1)}%</td></tr>`
+                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 1 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
                 ).join("")}</tbody>
             </table>`
             : "<p>No units match the selected capacity range.</p>"}
