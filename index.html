@@ -601,7 +601,6 @@ function renderUnitDetails(unitNumber) {
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
         ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
         ["Model", unit.model],
-        ["Unit price", formatCurrency(unit.price)],
         ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
         ["Capacity match", `${unit.capacityPercent.toFixed(1)}%`],
         ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
@@ -689,11 +688,11 @@ function updateQuotePrices() {
         const unit = quotedUnits[unitNumber];
         if (!unit) continue;
 
-        const unitPrice = Number(unit.price) || 0;
+        const unitListPrice = Number(unit.price) || 0;
         const options = getUnitOptions(unit);
         const optionNet = options.reduce((sum, option) =>
             sum + (option.optionId ? option.quantity * accessoryListPrice * costMultiplier : 0), 0);
-        const linePrice = unitPrice + optionNet;
+        const linePrice = unitListPrice * costMultiplier + optionNet;
         row.querySelector("[data-unit-price]").textContent = formatCurrency(linePrice);
         total += linePrice;
     }
@@ -827,7 +826,6 @@ for (const row of unitRows) {
     const unitNumber = row.dataset.unitRow;
     const quotedUnit = quotedUnits[unitNumber];
     if (quotedUnit) {
-        row.querySelector("[data-unit-price]").textContent = formatCurrency(quotedUnit.price);
         row.querySelector(".select-unit").textContent = "Change Unit";
     }
 
