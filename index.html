@@ -47,15 +47,28 @@
             list-style: none;
         }
 
-        .project-tree-item {
-            display: grid;
-            gap: 5px;
-        }
-
         .project-tree-new {
             width: 100%;
             margin: 0 0 12px;
             padding: 9px;
+        }
+
+        .project-tree-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 4px;
+            margin: -4px 0 12px;
+        }
+
+        .project-tree-actions button {
+            margin: 0;
+            padding: 6px 8px;
+            font-size: .78rem;
+        }
+
+        .project-tree-actions button:disabled {
+            opacity: .55;
+            cursor: not-allowed;
         }
 
         .project-tree-select {
@@ -83,22 +96,10 @@
             box-shadow: inset 3px 0 #004f9f;
         }
 
-        .project-tree-actions {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 4px;
-        }
-
-        .project-tree-actions button,
         .project-tree-archive-toggle {
             margin: 0;
             padding: 6px 4px;
             font-size: .78rem;
-        }
-
-        .project-tree-actions button:disabled {
-            opacity: .55;
-            cursor: not-allowed;
         }
 
         .project-tree-archive-toggle {
@@ -564,6 +565,12 @@
 <aside class="project-tree" aria-labelledby="project-tree-heading">
     <h2 id="project-tree-heading">Project Tree</h2>
     <button id="new-project" class="project-tree-new" type="button">New Project</button>
+    <div class="project-tree-actions" role="group" aria-label="Manage selected project">
+        <button id="move-project-up" type="button" disabled>Up</button>
+        <button id="move-project-down" type="button" disabled>Down</button>
+        <button id="archive-project" type="button" disabled>Archive</button>
+        <button id="delete-project" type="button" disabled>Delete</button>
+    </div>
     <ul id="project-tree-list" class="project-tree-list"></ul>
     <button id="project-tree-archive-toggle" class="project-tree-archive-toggle" type="button" aria-expanded="false" aria-controls="project-tree-archived" hidden>Show archived projects</button>
     <section id="project-tree-archived" class="project-tree-archived" aria-labelledby="project-tree-archived-heading" hidden>
@@ -735,6 +742,10 @@ const archivedProjectTreeToggle = document.getElementById("project-tree-archive-
 const projectTreeStatus = document.getElementById("project-tree-status");
 const addToProjectTreeButton = document.getElementById("add-to-project-tree");
 const newProjectButton = document.getElementById("new-project");
+const moveProjectUpButton = document.getElementById("move-project-up");
+const moveProjectDownButton = document.getElementById("move-project-down");
+const archiveProjectButton = document.getElementById("archive-project");
+const deleteProjectButton = document.getElementById("delete-project");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 const optionsPanel = document.getElementById("options-panel");
@@ -1005,6 +1016,14 @@ function renderProjectTree() {
         : "Add to project Tree";
     const activeProjects = projectTreeProjects.filter(project => !project.archived);
     const archivedProjects = projectTreeProjects.filter(project => project.archived);
+    const activeProject = projectTreeProjects.find(project => project.id === activeProjectId);
+    const activeProjectIndex = activeProjects.findIndex(project => project.id === activeProjectId);
+    moveProjectUpButton.disabled = activeProjectIndex <= 0;
+    moveProjectDownButton.disabled =
+        activeProjectIndex < 0 || activeProjectIndex >= activeProjects.length - 1;
+    archiveProjectButton.disabled = !activeProject;
+    archiveProjectButton.textContent = activeProject?.archived ? "Restore" : "Archive";
+    deleteProjectButton.disabled = !activeProject;
     if (archivedProjects.length === 0) {
         archivedProjectTreeToggle.setAttribute("aria-expanded", "false");
     }
@@ -1017,14 +1036,13 @@ function renderProjectTree() {
     archivedProjectTreeSection.hidden =
         archivedProjects.length === 0 || archivedProjectTreeToggle.getAttribute("aria-expanded") !== "true";
 
-    for (const [projects, list, isArchived] of [
-        [activeProjects, projectTreeList, false],
-        [archivedProjects, archivedProjectTreeList, true]
+    for (const [projects, list] of [
+        [activeProjects, projectTreeList],
+        [archivedProjects, archivedProjectTreeList]
     ]) {
-        for (const [index, project] of projects.entries()) {
+        for (const project of projects) {
             const projectName = getProjectTreeName(project);
             const item = document.createElement("li");
-            item.className = "project-tree-item";
             const selectButton = document.createElement("button");
             selectButton.type = "button";
             selectButton.className = "project-tree-select";
@@ -1041,41 +1059,6 @@ function renderProjectTree() {
                 if (project.id !== activeProjectId) activateProject(project);
             });
             item.append(selectButton);
-
-            const actions = document.createElement("div");
-            actions.className = "project-tree-actions";
-            if (!isArchived) {
-                const upButton = document.createElement("button");
-                upButton.type = "button";
-                upButton.textContent = "Up";
-                upButton.setAttribute("aria-label", `Move ${projectName} up`);
-                upButton.disabled = index === 0;
-                upButton.addEventListener("click", () => moveProject(project.id, -1));
-
-                const downButton = document.createElement("button");
-                downButton.type = "button";
-                downButton.textContent = "Down";
-                downButton.setAttribute("aria-label", `Move ${projectName} down`);
-                downButton.disabled = index === projects.length - 1;
-                downButton.addEventListener("click", () => moveProject(project.id, 1));
-                actions.append(upButton, downButton);
-            }
-
-            const archiveButton = document.createElement("button");
-            archiveButton.type = "button";
-            archiveButton.textContent = isArchived ? "Restore" : "Archive";
-            archiveButton.setAttribute("aria-label", `${isArchived ? "Restore" : "Archive"} ${projectName}`);
-            archiveButton.addEventListener("click", () =>
-                setProjectArchived(project.id, !isArchived)
-            );
-
-            const deleteButton = document.createElement("button");
-            deleteButton.type = "button";
-            deleteButton.textContent = "Delete";
-            deleteButton.setAttribute("aria-label", `Delete ${projectName}`);
-            deleteButton.addEventListener("click", () => deleteProject(project));
-            actions.append(archiveButton, deleteButton);
-            item.append(actions);
             list.append(item);
         }
     }
@@ -1137,6 +1120,24 @@ function deleteProject(project) {
         renderProjectTree();
     }
 }
+
+moveProjectUpButton.addEventListener("click", () => {
+    if (activeProjectId) moveProject(activeProjectId, -1);
+});
+
+moveProjectDownButton.addEventListener("click", () => {
+    if (activeProjectId) moveProject(activeProjectId, 1);
+});
+
+archiveProjectButton.addEventListener("click", () => {
+    const project = projectTreeProjects.find(item => item.id === activeProjectId);
+    if (project) setProjectArchived(project.id, !project.archived);
+});
+
+deleteProjectButton.addEventListener("click", () => {
+    const project = projectTreeProjects.find(item => item.id === activeProjectId);
+    if (project) deleteProject(project);
+});
 
 function loadProjectTree() {
     try {
