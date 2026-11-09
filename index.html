@@ -28,9 +28,29 @@
 
         .quote-layout {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.2fr);
             align-items: start;
             gap: 16px;
+        }
+
+        .project-panel {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        .unit-list {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .unit-details {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+        }
+
+        .options-panel {
+            grid-column: 3;
+            grid-row: 1 / span 2;
         }
 
         .project-panel,
@@ -323,9 +343,43 @@
             font-weight: bold;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1200px) {
             .quote-layout {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .project-panel {
+                grid-column: 1;
+                grid-row: 1;
+            }
+
+            .unit-list {
+                grid-column: 1;
+                grid-row: 2;
+            }
+
+            .unit-details {
+                grid-column: 2;
+                grid-row: 1;
+            }
+
+            .options-panel {
+                grid-column: 2;
+                grid-row: 2;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .quote-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .project-panel,
+            .unit-list,
+            .unit-details,
+            .options-panel {
+                grid-column: 1;
+                grid-row: auto;
             }
         }
 
@@ -467,7 +521,7 @@
             </form>
         </section>
 
-        <aside id="unit-details" class="unit-details" aria-labelledby="unit-details-heading">
+        <aside id="unit-details" class="unit-details" aria-labelledby="unit-details-heading" hidden>
             <h2 id="unit-details-heading">Selected Unit</h2>
             <p id="unit-details-empty">Add a unit to a quote to see its specifications here.</p>
             <dl id="unit-details-list" hidden></dl>
@@ -508,15 +562,7 @@
                     <thead>
                         <tr><th scope="col">Selectable Options</th><th scope="col">Qty</th><th scope="col">UOM</th><th scope="col">List</th><th scope="col">Net</th></tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td><select id="accessory-option" aria-label="Selectable option"><option value="hdg-internal-service-platform">HDG Internal Service Platform</option></select></td>
-                            <td><input id="accessory-quantity" type="number" min="1" step="1" value="1" aria-label="Option quantity"></td>
-                            <td>per Unit</td>
-                            <td id="accessory-list-price" class="option-price">$0.00</td>
-                            <td id="accessory-net-price" class="option-price">$0.00</td>
-                        </tr>
-                    </tbody>
+                    <tbody id="option-rows"></tbody>
                 </table>
             </div>
             <p class="price-note">HDG Internal Service Platform list price is a temporary $0.00 placeholder.</p>
@@ -532,9 +578,11 @@ const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 const optionsPanel = document.getElementById("options-panel");
 const multiplierInput = document.getElementById("cost-multiplier");
-const accessoryQuantityInput = document.getElementById("accessory-quantity");
-const accessoryOption = document.getElementById("accessory-option");
+const optionRows = document.getElementById("option-rows");
 const accessoryListPrice = 0;
+const optionLineCount = 12;
+const hdgOptionId = "hdg-internal-service-platform";
+const hdgOptionLabel = "HDG Internal Service Platform";
 let quotedUnits = {};
 const requestedUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
 let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= 8
@@ -561,8 +609,8 @@ function renderUnitDetails(unitNumber) {
         return;
     }
 
-    accessoryQuantityInput.value = String(unit.optionQuantity ?? 1);
-    accessoryOption.value = unit.optionId ?? "hdg-internal-service-platform";
+    const options = getUnitOptions(unit);
+    renderOptionRows(options);
     optionsPanel.hidden = false;
 
     const fields = [
@@ -597,6 +645,46 @@ function renderUnitDetails(unitNumber) {
     updateQuotePrices();
 }
 
+function getUnitOptions(unit) {
+    if (!Array.isArray(unit.options)) {
+        unit.options = Array.from({ length: optionLineCount }, (_, index) => ({
+            optionId: index === 0 ? (unit.optionId ?? hdgOptionId) : "",
+            quantity: index === 0 ? (unit.optionQuantity ?? 1) : 1
+        }));
+    }
+
+    unit.options = Array.from({ length: optionLineCount }, (_, index) => {
+        const option = unit.options[index];
+        return {
+            optionId: option?.optionId === hdgOptionId ? hdgOptionId : "",
+            quantity: Number.isInteger(Number(option?.quantity)) && Number(option.quantity) >= 1
+                ? Number(option.quantity)
+                : 1
+        };
+    });
+
+    return unit.options;
+}
+
+function renderOptionRows(options) {
+    optionRows.replaceChildren();
+    options.forEach((option, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td><select data-option-select="${index}" aria-label="Selectable option ${index + 1}">
+                <option value="">Select an option</option>
+                <option value="${hdgOptionId}">${hdgOptionLabel}</option>
+            </select></td>
+            <td><input data-option-quantity="${index}" type="number" min="1" step="1" value="${option.quantity}" aria-label="Option ${index + 1} quantity"></td>
+            <td>per Unit</td>
+            <td data-option-list-price="${index}" class="option-price">${formatCurrency(accessoryListPrice)}</td>
+            <td data-option-net-price="${index}" class="option-price">${formatCurrency(0)}</td>
+        `;
+        row.querySelector(`[data-option-select="${index}"]`).value = option.optionId;
+        optionRows.append(row);
+    });
+}
+
 function saveQuotedUnits() {
     try {
         sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(quotedUnits));
@@ -617,16 +705,27 @@ function updateQuotePrices() {
         if (!unit) continue;
 
         const unitPrice = Number(unit.price) || 0;
-        const optionNet = (Number(unit.optionQuantity) || 1) * accessoryListPrice * costMultiplier;
+        const options = getUnitOptions(unit);
+        const optionNet = options.reduce((sum, option) =>
+            sum + (option.optionId ? option.quantity * accessoryListPrice * costMultiplier : 0), 0);
         const linePrice = unitPrice + optionNet;
         row.querySelector("[data-unit-price]").textContent = formatCurrency(linePrice);
         total += linePrice;
     }
 
     document.getElementById("quote-total").textContent = `Total Cost: ${formatCurrency(total)}`;
-    document.getElementById("accessory-list-price").textContent = formatCurrency(accessoryListPrice);
-    document.getElementById("accessory-net-price").textContent =
-        formatCurrency(accessoryListPrice * (Number(accessoryQuantityInput.value) || 1) * costMultiplier);
+    const activeUnit = Number.isInteger(activeUnitNumber) ? quotedUnits[activeUnitNumber] : null;
+    if (!activeUnit) return;
+
+    for (const [index, option] of getUnitOptions(activeUnit).entries()) {
+        const listPrice = document.querySelector(`[data-option-list-price="${index}"]`);
+        const netPrice = document.querySelector(`[data-option-net-price="${index}"]`);
+        if (!listPrice || !netPrice) continue;
+        listPrice.textContent = formatCurrency(accessoryListPrice);
+        netPrice.textContent = formatCurrency(
+            option.optionId ? accessoryListPrice * option.quantity * costMultiplier : 0
+        );
+    }
 }
 
 function validateCostMultiplier() {
@@ -681,7 +780,12 @@ function saveProjectData() {
 }
 
 function updateUnitList() {
-    unitList.hidden = !projectForm.checkValidity();
+    const projectIsValid = projectForm.checkValidity();
+    unitList.hidden = !projectIsValid;
+    document.getElementById("unit-details").hidden = !projectIsValid;
+    optionsPanel.hidden = !projectIsValid ||
+        !Number.isInteger(activeUnitNumber) ||
+        !quotedUnits[activeUnitNumber];
 }
 
 try {
@@ -775,33 +879,40 @@ updateQuotePrices();
 multiplierInput.addEventListener("input", validateCostMultiplier);
 multiplierInput.addEventListener("change", validateCostMultiplier);
 
-accessoryQuantityInput.addEventListener("input", () => {
-    const quantity = Number(accessoryQuantityInput.value);
-    if (!Number.isInteger(quantity) || quantity < 1 || !Number.isInteger(activeUnitNumber)) {
-        accessoryQuantityInput.setCustomValidity("Enter a quantity of at least 1.");
-        return;
-    }
-    accessoryQuantityInput.setCustomValidity("");
-    const unit = quotedUnits[activeUnitNumber];
-    if (!unit) return;
-    unit.optionQuantity = quantity;
+optionRows.addEventListener("input", event => {
+    const quantityInput = event.target.closest("[data-option-quantity]");
+    if (!quantityInput || !Number.isInteger(activeUnitNumber) || !quotedUnits[activeUnitNumber]) return;
+
+    const quantity = Number(quantityInput.value);
+    const index = Number(quantityInput.dataset.optionQuantity);
+    const isValid = Number.isInteger(quantity) && quantity >= 1;
+    quantityInput.setCustomValidity(isValid ? "" : "Enter a quantity of at least 1.");
+    if (!isValid) return;
+
+    getUnitOptions(quotedUnits[activeUnitNumber])[index].quantity = quantity;
     saveQuotedUnits();
     updateQuotePrices();
-});
-accessoryQuantityInput.addEventListener("change", () => {
-    const quantity = Number(accessoryQuantityInput.value);
-    if (!Number.isInteger(quantity) || quantity < 1) {
-        accessoryQuantityInput.reportValidity();
-        return;
-    }
-    accessoryQuantityInput.value = String(quantity);
 });
 
-accessoryOption.addEventListener("change", () => {
-    if (!Number.isInteger(activeUnitNumber) || !quotedUnits[activeUnitNumber]) return;
-    quotedUnits[activeUnitNumber].optionId = accessoryOption.value;
-    saveQuotedUnits();
-    updateQuotePrices();
+optionRows.addEventListener("change", event => {
+    const select = event.target.closest("[data-option-select]");
+    if (select && Number.isInteger(activeUnitNumber) && quotedUnits[activeUnitNumber]) {
+        const index = Number(select.dataset.optionSelect);
+        getUnitOptions(quotedUnits[activeUnitNumber])[index].optionId =
+            select.value === hdgOptionId ? hdgOptionId : "";
+        saveQuotedUnits();
+        updateQuotePrices();
+        return;
+    }
+
+    const quantityInput = event.target.closest("[data-option-quantity]");
+    if (!quantityInput) return;
+    const quantity = Number(quantityInput.value);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+        quantityInput.reportValidity();
+        return;
+    }
+    quantityInput.value = String(quantity);
 });
 
 validateCostMultiplier();
