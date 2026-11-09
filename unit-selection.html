@@ -632,11 +632,17 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
         savedUnits[quoteUnitNumber] = {
             ...selectedUnit,
             price: 1,
+            optionId: "hdg-internal-service-platform",
+            optionQuantity: 1,
             refrigerant: document.getElementById("Refrigerant").value,
             motorVoltage: document.getElementById("Motor Voltage").value,
             requiredCapacity: Number(document.getElementById("Capacity").value),
             condensingTemperature: Number(document.getElementById("Condensing Temperature").value),
             wetBulbTemperature: Number(document.getElementById("Wet Bulb Temperature").value),
+            lowerTolerance: Number(document.getElementById("Lower Tolerance").value),
+            upperTolerance: Number(document.getElementById("Upper Tolerance").value),
+            searchSortKey: sortKey,
+            searchSortDirection: sortDirection,
             location: unitRow.location || "",
             tag: unitRow.tag || ""
         };
@@ -703,6 +709,36 @@ function findUnit() {
     renderMatchingUnits(result);
 }
 
+if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber <= 8) {
+    try {
+        const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
+        const savedUnit = savedUnits[quoteUnitNumber];
+        if (savedUnit) {
+            document.getElementById("Capacity").value = String(savedUnit.requiredCapacity ?? "");
+            document.getElementById("Refrigerant").value = savedUnit.refrigerant ?? "R717";
+            document.getElementById("Condensing Temperature").value = String(savedUnit.condensingTemperature ?? "");
+            document.getElementById("Wet Bulb Temperature").value = String(savedUnit.wetBulbTemperature ?? "");
+            document.getElementById("Motor Voltage").value = savedUnit.motorVoltage ?? "460/3/60";
+            document.getElementById("Lower Tolerance").value = String(savedUnit.lowerTolerance ?? -10);
+            document.getElementById("Upper Tolerance").value = String(savedUnit.upperTolerance ?? 10);
+
+            findUnit();
+            if (matchingUnits.some(unit => unit.model === savedUnit.model)) {
+                selectedUnitModel = savedUnit.model;
+                sortKey = resultColumns.some(column => column.key === savedUnit.searchSortKey)
+                    ? savedUnit.searchSortKey
+                    : "capacityPercent";
+                sortDirection = savedUnit.searchSortDirection === "desc" ? "desc" : "asc";
+                renderMatchingUnits(document.getElementById("result"));
+            }
+        }
+    } catch (error) {
+        const result = document.getElementById("result");
+        result.textContent = "The saved unit design could not be restored. Enter the design conditions and click Find Unit.";
+        console.error("Could not restore saved unit design.", error);
+    }
+}
+
 </script>
 <script>
 try {
@@ -726,6 +762,7 @@ try {
             quoteNumber: "Quote #",
             preparedBy: "Prepared by",
             projectType: "New/Replacement",
+            salesTerritory: "Sales Territory",
             expectedClose: "Expected Close",
             probability: "Probability",
             probabilityComment: "Probability comment",

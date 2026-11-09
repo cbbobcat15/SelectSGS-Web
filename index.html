@@ -18,12 +18,29 @@
         }
 
         main {
-            width: min(100%, 900px);
+            width: min(100%, 1500px);
             margin: 0 auto;
             padding: 30px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
+        }
+
+        .quote-layout {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: start;
+            gap: 16px;
+        }
+
+        .project-panel,
+        .unit-list,
+        .unit-details,
+        .options-panel {
+            min-width: 0;
+            padding: 18px;
+            border: 1px solid #8797a5;
+            background: #f3f3f3;
         }
 
         h1 {
@@ -109,19 +126,9 @@
             color: #a12622;
         }
 
-        .unit-list {
-            margin-top: 30px;
-        }
-
         .unit-list h2 {
+            margin-top: 0;
             color: #004f9f;
-        }
-
-        .unit-list-layout {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(260px, .7fr);
-            align-items: start;
-            gap: 20px;
         }
 
         .unit-table-wrapper {
@@ -155,6 +162,13 @@
         .unit-list td:last-child {
             width: 100px;
             text-align: right;
+        }
+
+        .unit-list th:nth-child(2),
+        .unit-list td:nth-child(2),
+        .unit-list th:nth-child(3),
+        .unit-list td:nth-child(3) {
+            width: 22%;
         }
 
         .unit-list td:first-child {
@@ -192,12 +206,11 @@
         }
 
         .unit-details {
-            padding: 18px;
             border-left: 5px solid #004f9f;
-            background: #eef5ff;
+            background: #d6d6d6;
         }
 
-        .unit-details h3 {
+        .unit-details h2 {
             margin: 0 0 14px;
             color: #004f9f;
         }
@@ -216,6 +229,104 @@
         .unit-details dd {
             margin: 0;
             overflow-wrap: anywhere;
+        }
+
+        .options-panel h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            text-decoration: underline;
+        }
+
+        .options-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .multiplier-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .multiplier-field label {
+            margin: 0;
+        }
+
+        .multiplier-field input {
+            width: 76px;
+            min-height: 32px;
+            padding: 4px 6px;
+            text-align: right;
+        }
+
+        .option-table-wrapper {
+            overflow-x: auto;
+        }
+
+        .option-table {
+            width: 100%;
+            min-width: 500px;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .option-table th,
+        .option-table td {
+            padding: 4px;
+            border: 1px solid #8797a5;
+            text-align: center;
+        }
+
+        .option-table th:first-child,
+        .option-table td:first-child {
+            width: 55%;
+            text-align: left;
+        }
+
+        .option-table input,
+        .option-table select {
+            width: 100%;
+            min-width: 0;
+            min-height: 30px;
+            margin: 0;
+            padding: 4px;
+            border: 1px solid #8797a5;
+            border-radius: 0;
+            background: white;
+            font: inherit;
+        }
+
+        .option-table .option-price {
+            background: #e3b985;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .price-note,
+        #multiplier-error {
+            margin: 8px 0 0;
+            color: #53677a;
+            font-size: .9rem;
+        }
+
+        #multiplier-error {
+            color: #a12622;
+        }
+
+        .quote-total {
+            margin: 12px 0 0;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        @media (max-width: 900px) {
+            .quote-layout {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 600px) {
@@ -238,8 +349,16 @@
                 grid-column: auto;
             }
 
-            .unit-list-layout {
-                grid-template-columns: 1fr;
+            .project-panel,
+            .unit-list,
+            .unit-details,
+            .options-panel {
+                padding: 14px;
+            }
+
+            .options-heading {
+                align-items: flex-start;
+                flex-direction: column;
             }
         }
     </style>
@@ -249,7 +368,9 @@
     <h1>Project Information</h1>
     <p class="intro">Enter the project details before selecting equipment.</p>
 
-    <form id="project-form">
+    <div class="quote-layout">
+        <section class="project-panel" aria-label="Project information">
+            <form id="project-form">
         <div class="field">
             <label for="customer">Customer <span class="required" aria-hidden="true">*</span></label>
             <input id="customer" name="customer" type="text" autocomplete="organization" required>
@@ -276,6 +397,26 @@
                 <option value="">Select project type</option>
                 <option>New</option>
                 <option>Replacement</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="sales-territory">Sales Territory <span class="required" aria-hidden="true">*</span></label>
+            <select id="sales-territory" name="salesTerritory" required>
+                <option value="">Select sales territory</option>
+                <option>Northeast US</option>
+                <option>Mid-Atlantic US</option>
+                <option>Southeast US</option>
+                <option>Southwest US</option>
+                <option>Central US</option>
+                <option>Upper Mid-West US</option>
+                <option>Eastern Mid-West US</option>
+                <option>West Coast US</option>
+                <option>Pacific Northwest US</option>
+                <option>Eastern Canada</option>
+                <option>Western Canada</option>
+                <option>Latin &amp; South America</option>
+                <option>EMEA</option>
+                <option>APAC</option>
             </select>
         </div>
         <div class="field">
@@ -322,16 +463,22 @@
             <label for="opportunity-number">Opportunity #</label>
             <input id="opportunity-number" name="opportunityNumber" type="text">
         </div>
-        <p id="form-error" role="alert" hidden></p>
-    </form>
+                <p id="form-error" role="alert" hidden></p>
+            </form>
+        </section>
 
-    <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
-        <h2 id="unit-list-heading">Select Units</h2>
-        <div class="unit-list-layout">
+        <aside id="unit-details" class="unit-details" aria-labelledby="unit-details-heading">
+            <h2 id="unit-details-heading">Selected Unit</h2>
+            <p id="unit-details-empty">Add a unit to a quote to see its specifications here.</p>
+            <dl id="unit-details-list" hidden></dl>
+        </aside>
+
+        <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
+            <h2 id="unit-list-heading">Item Summary</h2>
             <div class="unit-table-wrapper">
                 <table>
                     <thead>
-                        <tr><th scope="col">#</th><th scope="col">Location</th><th scope="col">Unit Tag</th><th scope="col">Unit Type</th><th scope="col">Unit Price</th></tr>
+                        <tr><th scope="col">#</th><th scope="col">Location</th><th scope="col">Unit Tag</th><th scope="col">Unit Type</th><th scope="col">Net Price</th></tr>
                     </thead>
                     <tbody>
                         <tr data-unit-row="1"><th scope="row">1</th><td><input data-unit-field="location" aria-label="Location for unit 1"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 1"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
@@ -345,13 +492,37 @@
                     </tbody>
                 </table>
             </div>
-            <aside id="unit-details" class="unit-details" aria-labelledby="unit-details-heading">
-                <h3 id="unit-details-heading">Selected Line Item</h3>
-                <p id="unit-details-empty">Add a unit to a quote to see its specifications here.</p>
-                <dl id="unit-details-list" hidden></dl>
-            </aside>
-        </div>
-    </section>
+            <p id="quote-total" class="quote-total"></p>
+        </section>
+
+        <section id="options-panel" class="options-panel" aria-labelledby="options-heading" hidden>
+            <div class="options-heading">
+                <h2 id="options-heading">Options (per UOM)</h2>
+                <div class="multiplier-field">
+                    <label for="cost-multiplier">Cost Multiplier</label>
+                    <input id="cost-multiplier" type="number" min="0" max="1" step="any" value="0.35" required aria-describedby="multiplier-error">
+                </div>
+            </div>
+            <div class="option-table-wrapper">
+                <table class="option-table">
+                    <thead>
+                        <tr><th scope="col">Selectable Options</th><th scope="col">Qty</th><th scope="col">UOM</th><th scope="col">List</th><th scope="col">Net</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><select id="accessory-option" aria-label="Selectable option"><option value="hdg-internal-service-platform">HDG Internal Service Platform</option></select></td>
+                            <td><input id="accessory-quantity" type="number" min="1" step="1" value="1" aria-label="Option quantity"></td>
+                            <td>per Unit</td>
+                            <td id="accessory-list-price" class="option-price">$0.00</td>
+                            <td id="accessory-net-price" class="option-price">$0.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="price-note">HDG Internal Service Platform list price is a temporary $0.00 placeholder.</p>
+            <p id="multiplier-error" role="alert" hidden></p>
+        </section>
+    </div>
 </main>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -359,17 +530,24 @@ const projectFields = [...projectForm.elements].filter(element => element.name);
 const formError = document.getElementById("form-error");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
+const optionsPanel = document.getElementById("options-panel");
+const multiplierInput = document.getElementById("cost-multiplier");
+const accessoryQuantityInput = document.getElementById("accessory-quantity");
+const accessoryOption = document.getElementById("accessory-option");
+const accessoryListPrice = 0;
 let quotedUnits = {};
 const requestedUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
-const activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= 8
+let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= 8
     ? requestedUnitNumber
     : null;
+let costMultiplier = 0.35;
 
 function formatCurrency(value) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(value);
 }
 
 function renderUnitDetails(unitNumber) {
+    activeUnitNumber = Number(unitNumber);
     const unit = quotedUnits[unitNumber];
     const unitRow = unitRows[unitNumber - 1];
     const details = document.getElementById("unit-details-list");
@@ -379,8 +557,13 @@ function renderUnitDetails(unitNumber) {
     if (!unit) {
         details.hidden = true;
         emptyMessage.hidden = false;
+        optionsPanel.hidden = true;
         return;
     }
+
+    accessoryQuantityInput.value = String(unit.optionQuantity ?? 1);
+    accessoryOption.value = unit.optionId ?? "hdg-internal-service-platform";
+    optionsPanel.hidden = false;
 
     const fields = [
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
@@ -411,6 +594,65 @@ function renderUnitDetails(unitNumber) {
 
     emptyMessage.hidden = true;
     details.hidden = false;
+    updateQuotePrices();
+}
+
+function saveQuotedUnits() {
+    try {
+        sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(quotedUnits));
+        return true;
+    } catch (error) {
+        formError.textContent = "Quote line items could not be saved in this browser. Check your browser storage settings and try again.";
+        formError.hidden = false;
+        console.error("Could not save quoted units.", error);
+        return false;
+    }
+}
+
+function updateQuotePrices() {
+    let total = 0;
+    for (const row of unitRows) {
+        const unitNumber = row.dataset.unitRow;
+        const unit = quotedUnits[unitNumber];
+        if (!unit) continue;
+
+        const unitPrice = Number(unit.price) || 0;
+        const optionNet = (Number(unit.optionQuantity) || 1) * accessoryListPrice * costMultiplier;
+        const linePrice = unitPrice + optionNet;
+        row.querySelector("[data-unit-price]").textContent = formatCurrency(linePrice);
+        total += linePrice;
+    }
+
+    document.getElementById("quote-total").textContent = `Total Cost: ${formatCurrency(total)}`;
+    document.getElementById("accessory-list-price").textContent = formatCurrency(accessoryListPrice);
+    document.getElementById("accessory-net-price").textContent =
+        formatCurrency(accessoryListPrice * (Number(accessoryQuantityInput.value) || 1) * costMultiplier);
+}
+
+function validateCostMultiplier() {
+    const multiplier = Number(multiplierInput.value);
+    const isValid = multiplierInput.value.trim() !== "" &&
+        Number.isFinite(multiplier) && multiplier > 0 && multiplier <= 1;
+    multiplierInput.setCustomValidity(isValid ? "" : "Enter a cost multiplier greater than 0 and no greater than 1.");
+    document.getElementById("multiplier-error").textContent = isValid
+        ? ""
+        : "Enter a cost multiplier greater than 0 and no greater than 1.";
+    document.getElementById("multiplier-error").hidden = isValid;
+    multiplierInput.setAttribute("aria-invalid", String(!isValid));
+    if (!isValid) return false;
+
+    costMultiplier = multiplier;
+    try {
+        sessionStorage.setItem("selectsgs-cost-multiplier", String(costMultiplier));
+    } catch (error) {
+        formError.textContent = "Cost multiplier could not be saved in this browser. Check your browser storage settings and try again.";
+        formError.hidden = false;
+        console.error("Could not save cost multiplier.", error);
+        return false;
+    }
+
+    updateQuotePrices();
+    return true;
 }
 
 function getProjectData() {
@@ -470,6 +712,11 @@ try {
     if (savedQuotedUnits && typeof savedQuotedUnits === "object" && !Array.isArray(savedQuotedUnits)) {
         quotedUnits = savedQuotedUnits;
     }
+    const savedMultiplier = Number(sessionStorage.getItem("selectsgs-cost-multiplier"));
+    if (Number.isFinite(savedMultiplier) && savedMultiplier > 0 && savedMultiplier <= 1) {
+        costMultiplier = savedMultiplier;
+        multiplierInput.value = String(savedMultiplier);
+    }
 } catch (error) {
     formError.textContent = "Saved project information could not be loaded. You can still enter the details again.";
     formError.hidden = false;
@@ -522,6 +769,42 @@ for (const row of unitRows) {
         window.location.href = `unit-selection.html?unit=${unitNumber}`;
     });
 }
+
+updateQuotePrices();
+
+multiplierInput.addEventListener("input", validateCostMultiplier);
+multiplierInput.addEventListener("change", validateCostMultiplier);
+
+accessoryQuantityInput.addEventListener("input", () => {
+    const quantity = Number(accessoryQuantityInput.value);
+    if (!Number.isInteger(quantity) || quantity < 1 || !Number.isInteger(activeUnitNumber)) {
+        accessoryQuantityInput.setCustomValidity("Enter a quantity of at least 1.");
+        return;
+    }
+    accessoryQuantityInput.setCustomValidity("");
+    const unit = quotedUnits[activeUnitNumber];
+    if (!unit) return;
+    unit.optionQuantity = quantity;
+    saveQuotedUnits();
+    updateQuotePrices();
+});
+accessoryQuantityInput.addEventListener("change", () => {
+    const quantity = Number(accessoryQuantityInput.value);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+        accessoryQuantityInput.reportValidity();
+        return;
+    }
+    accessoryQuantityInput.value = String(quantity);
+});
+
+accessoryOption.addEventListener("change", () => {
+    if (!Number.isInteger(activeUnitNumber) || !quotedUnits[activeUnitNumber]) return;
+    quotedUnits[activeUnitNumber].optionId = accessoryOption.value;
+    saveQuotedUnits();
+    updateQuotePrices();
+});
+
+validateCostMultiplier();
 
 if (activeUnitNumber) {
     renderUnitDetails(activeUnitNumber);
