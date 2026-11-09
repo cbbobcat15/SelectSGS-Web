@@ -28,7 +28,7 @@
 
         .quote-layout {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.2fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             align-items: start;
             gap: 16px;
         }
@@ -45,12 +45,12 @@
 
         .unit-details {
             grid-column: 2;
-            grid-row: 1 / span 2;
+            grid-row: 1;
         }
 
         .options-panel {
-            grid-column: 3;
-            grid-row: 1 / span 2;
+            grid-column: 2;
+            grid-row: 2;
         }
 
         .project-panel,
@@ -343,32 +343,6 @@
             font-weight: bold;
         }
 
-        @media (max-width: 1200px) {
-            .quote-layout {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
-            .project-panel {
-                grid-column: 1;
-                grid-row: 1;
-            }
-
-            .unit-list {
-                grid-column: 1;
-                grid-row: 2;
-            }
-
-            .unit-details {
-                grid-column: 2;
-                grid-row: 1;
-            }
-
-            .options-panel {
-                grid-column: 2;
-                grid-row: 2;
-            }
-        }
-
         @media (max-width: 760px) {
             .quote-layout {
                 grid-template-columns: minmax(0, 1fr);
@@ -583,6 +557,7 @@ const accessoryListPrice = 0;
 const optionLineCount = 12;
 const hdgOptionId = "hdg-internal-service-platform";
 const hdgOptionLabel = "HDG Internal Service Platform";
+const deselectOptionValue = "__deselect__";
 let quotedUnits = {};
 const requestedUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
 let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= 8
@@ -673,6 +648,7 @@ function renderOptionRows(options) {
         row.innerHTML = `
             <td><select data-option-select="${index}" aria-label="Selectable option ${index + 1}">
                 <option value="">Select an option</option>
+                <option value="${deselectOptionValue}">Deselect option</option>
                 <option value="${hdgOptionId}">${hdgOptionLabel}</option>
             </select></td>
             <td><input data-option-quantity="${index}" type="number" min="1" step="1" value="${option.quantity}" aria-label="Option ${index + 1} quantity"></td>
@@ -898,8 +874,25 @@ optionRows.addEventListener("change", event => {
     const select = event.target.closest("[data-option-select]");
     if (select && Number.isInteger(activeUnitNumber) && quotedUnits[activeUnitNumber]) {
         const index = Number(select.dataset.optionSelect);
-        getUnitOptions(quotedUnits[activeUnitNumber])[index].optionId =
-            select.value === hdgOptionId ? hdgOptionId : "";
+        const options = getUnitOptions(quotedUnits[activeUnitNumber]);
+        if (select.value === deselectOptionValue) {
+            const selectedOptions = options.filter((option, optionIndex) =>
+                optionIndex !== index && option.optionId
+            );
+            options.splice(
+                0,
+                options.length,
+                ...selectedOptions,
+                ...Array.from({ length: optionLineCount - selectedOptions.length }, () => ({
+                    optionId: "",
+                    quantity: 1
+                }))
+            );
+            renderOptionRows(options);
+            optionRows.querySelector(`[data-option-select="${Math.min(index, selectedOptions.length)}"]`)?.focus();
+        } else {
+            options[index].optionId = select.value === hdgOptionId ? hdgOptionId : "";
+        }
         saveQuotedUnits();
         updateQuotePrices();
         return;
