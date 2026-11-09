@@ -17,13 +17,107 @@
             font-family: Arial, sans-serif;
         }
 
-        main {
-            width: min(100%, 1500px);
+        .workspace {
+            display: grid;
+            grid-template-columns: 240px minmax(0, 1fr);
+            align-items: start;
+            gap: 20px;
+            width: min(100%, 1760px);
             margin: 0 auto;
+        }
+
+        .project-tree {
+            padding: 16px;
+            border: 1px solid #c4cbd2;
+            border-radius: 8px;
+            background: #e9edf1;
+        }
+
+        .project-tree h2 {
+            margin: 0 0 12px;
+            color: #004f9f;
+            font-size: 1.15rem;
+        }
+
+        .project-tree-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .project-tree-new {
+            width: 100%;
+            margin: 0 0 12px;
+            padding: 9px;
+        }
+
+        .project-tree-list button {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 10px;
+            border: 1px solid #aeb8c1;
+            border-radius: 3px;
+            background: #f8f9fa;
+            color: #263746;
+            text-align: left;
+            overflow-wrap: anywhere;
+        }
+
+        .project-tree-list button:hover {
+            border-color: #004f9f;
+            background: #dceeff;
+            color: #263746;
+        }
+
+        .project-tree-list button[aria-current="true"] {
+            border-color: #004f9f;
+            background: #dceeff;
+            box-shadow: inset 3px 0 #004f9f;
+        }
+
+        .project-tree-meta {
+            display: block;
+            margin-top: 4px;
+            color: #53677a;
+            font-size: .85rem;
+            font-weight: normal;
+        }
+
+        #project-tree-status {
+            margin: 12px 0 0;
+            color: #53677a;
+            font-size: .9rem;
+        }
+
+        .page-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        main {
+            width: 100%;
+            min-width: 0;
             padding: 30px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
+        }
+
+        .page-heading h1 {
+            margin: 0;
+        }
+
+        .project-tree-add {
+            grid-column: auto;
+            justify-self: auto;
+            margin: 0;
         }
 
         .quote-layout {
@@ -353,6 +447,10 @@
         }
 
         @media (max-width: 760px) {
+            .workspace {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
             .quote-layout {
                 grid-template-columns: minmax(0, 1fr);
             }
@@ -373,6 +471,10 @@
 
             main {
                 padding: 20px;
+            }
+
+            .project-tree {
+                padding: 14px;
             }
 
             form {
@@ -401,8 +503,18 @@
     </style>
 </head>
 <body>
+<div class="workspace">
+<aside class="project-tree" aria-labelledby="project-tree-heading">
+    <h2 id="project-tree-heading">Project Tree</h2>
+    <button id="new-project" class="project-tree-new" type="button">New Project</button>
+    <ul id="project-tree-list" class="project-tree-list"></ul>
+    <p id="project-tree-status" role="status">No projects added yet.</p>
+</aside>
 <main>
-    <h1>Project Information</h1>
+    <div class="page-heading">
+        <h1>Project Information</h1>
+        <button id="add-to-project-tree" class="project-tree-add" type="button">Add to project Tree</button>
+    </div>
     <p class="intro">Enter the project details before selecting equipment.</p>
 
     <div class="quote-layout">
@@ -553,10 +665,15 @@
         </section>
     </div>
 </main>
+</div>
 <script>
 const projectForm = document.getElementById("project-form");
 const projectFields = [...projectForm.elements].filter(element => element.name);
 const formError = document.getElementById("form-error");
+const projectTreeList = document.getElementById("project-tree-list");
+const projectTreeStatus = document.getElementById("project-tree-status");
+const addToProjectTreeButton = document.getElementById("add-to-project-tree");
+const newProjectButton = document.getElementById("new-project");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 const optionsPanel = document.getElementById("options-panel");
@@ -573,6 +690,8 @@ let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNum
     ? requestedUnitNumber
     : null;
 let costMultiplier = 0.35;
+let activeProjectId = null;
+let projectTreeProjects = [];
 
 function formatCurrency(value) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(value);
@@ -672,13 +791,14 @@ function renderOptionRows(options) {
 function saveQuotedUnits() {
     try {
         sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(quotedUnits));
-        return true;
     } catch (error) {
         formError.textContent = "Quote line items could not be saved in this browser. Check your browser storage settings and try again.";
         formError.hidden = false;
         console.error("Could not save quoted units.", error);
         return false;
     }
+
+    return saveActiveProjectToTree();
 }
 
 function updateQuotePrices() {
@@ -734,6 +854,7 @@ function validateCostMultiplier() {
         return false;
     }
 
+    if (!saveActiveProjectToTree()) return false;
     updateQuotePrices();
     return true;
 }
@@ -749,18 +870,133 @@ function getUnitData() {
     }));
 }
 
+function getProjectSnapshot(id = activeProjectId) {
+    return {
+        id,
+        project: getProjectData(),
+        unitRows: getUnitData(),
+        quotedUnits: JSON.parse(JSON.stringify(quotedUnits)),
+        costMultiplier,
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function showProjectTreeError(message, error) {
+    formError.textContent = message;
+    formError.hidden = false;
+    console.error(message, error);
+}
+
+function saveProjectTree() {
+    try {
+        localStorage.setItem("selectsgs-project-tree", JSON.stringify(projectTreeProjects));
+        return true;
+    } catch (error) {
+        showProjectTreeError("Projects could not be saved in this browser. Check your browser storage settings and try again.", error);
+        return false;
+    }
+}
+
+function saveActiveProjectToTree() {
+    if (!activeProjectId) return true;
+
+    const projectIndex = projectTreeProjects.findIndex(project => project.id === activeProjectId);
+    if (projectIndex === -1) return true;
+
+    projectTreeProjects[projectIndex] = getProjectSnapshot(activeProjectId);
+    if (!saveProjectTree()) return false;
+    renderProjectTree();
+    return true;
+}
+
+function getProjectTreeName(project) {
+    const projectName = typeof project.project?.projectName === "string"
+        ? project.project.projectName.trim()
+        : "";
+    const customer = typeof project.project?.customer === "string"
+        ? project.project.customer.trim()
+        : "";
+    if (projectName && customer) return `${projectName} — ${customer}`;
+    return projectName || customer || "Untitled project";
+}
+
+function activateProject(project) {
+    if (!saveProjectData()) return;
+
+    try {
+        sessionStorage.setItem("selectsgs-project", JSON.stringify(project.project || {}));
+        sessionStorage.setItem("selectsgs-unit-rows", JSON.stringify(project.unitRows || []));
+        sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(project.quotedUnits || {}));
+        sessionStorage.setItem("selectsgs-cost-multiplier", String(project.costMultiplier ?? 0.35));
+        sessionStorage.setItem("selectsgs-active-project-id", project.id);
+        window.location.href = "index.html";
+    } catch (error) {
+        showProjectTreeError("The selected project could not be loaded in this browser. Check your browser storage settings and try again.", error);
+    }
+}
+
+function renderProjectTree() {
+    projectTreeList.replaceChildren();
+    addToProjectTreeButton.textContent = activeProjectId
+        ? "Save changes to project Tree"
+        : "Add to project Tree";
+    projectTreeStatus.textContent = projectTreeProjects.length
+        ? `${projectTreeProjects.length} project${projectTreeProjects.length === 1 ? "" : "s"}`
+        : "No projects added yet.";
+
+    for (const project of projectTreeProjects) {
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("aria-current", String(project.id === activeProjectId));
+        button.append(document.createTextNode(getProjectTreeName(project)));
+
+        const metadata = document.createElement("span");
+        metadata.className = "project-tree-meta";
+        metadata.textContent = project.project?.quoteNumber
+            ? `Quote #${project.project.quoteNumber}`
+            : "Project";
+        button.append(metadata);
+        button.addEventListener("click", () => {
+            if (project.id !== activeProjectId) activateProject(project);
+        });
+        item.append(button);
+        projectTreeList.append(item);
+    }
+}
+
+function loadProjectTree() {
+    try {
+        const savedProjects = localStorage.getItem("selectsgs-project-tree");
+        if (savedProjects) {
+            const parsedProjects = JSON.parse(savedProjects);
+            if (!Array.isArray(parsedProjects)) {
+                throw new Error("Saved project tree data is not a list.");
+            }
+            projectTreeProjects = parsedProjects.filter(project =>
+                project && typeof project.id === "string" && project.project && typeof project.project === "object"
+            );
+        }
+    } catch (error) {
+        showProjectTreeError("The Project Tree could not be loaded from this browser.", error);
+    }
+
+    renderProjectTree();
+}
+
 function saveProjectData() {
     try {
         sessionStorage.setItem("selectsgs-project", JSON.stringify(getProjectData()));
         sessionStorage.setItem("selectsgs-unit-rows", JSON.stringify(getUnitData()));
-        formError.hidden = true;
-        return true;
     } catch (error) {
         formError.textContent = "Project information could not be saved in this browser. Check your browser storage settings and try again.";
         formError.hidden = false;
         console.error("Could not save project information.", error);
         return false;
     }
+
+    formError.hidden = true;
+    return saveActiveProjectToTree();
 }
 
 function updateUnitList() {
@@ -773,6 +1009,7 @@ function updateUnitList() {
 }
 
 try {
+    activeProjectId = sessionStorage.getItem("selectsgs-active-project-id");
     const savedProject = sessionStorage.getItem("selectsgs-project");
     if (savedProject) {
         const project = JSON.parse(savedProject);
@@ -810,6 +1047,53 @@ try {
     formError.hidden = false;
     console.error("Could not load saved project information.", error);
 }
+
+loadProjectTree();
+saveActiveProjectToTree();
+
+addToProjectTreeButton.addEventListener("click", () => {
+    if (!saveProjectData()) return;
+
+    if (activeProjectId) {
+        projectTreeStatus.textContent = "Project changes saved.";
+        return;
+    }
+
+    const project = getProjectSnapshot();
+    project.id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    projectTreeProjects.unshift(project);
+    if (!saveProjectTree()) {
+        projectTreeProjects.shift();
+        return;
+    }
+
+    try {
+        sessionStorage.setItem("selectsgs-active-project-id", project.id);
+        activeProjectId = project.id;
+    } catch (error) {
+        showProjectTreeError("The project was added, but the active project could not be remembered in this browser.", error);
+    }
+    renderProjectTree();
+});
+
+newProjectButton.addEventListener("click", () => {
+    if (!saveProjectData()) return;
+
+    try {
+        for (const key of [
+            "selectsgs-project",
+            "selectsgs-unit-rows",
+            "selectsgs-quoted-units",
+            "selectsgs-cost-multiplier",
+            "selectsgs-active-project-id"
+        ]) {
+            sessionStorage.removeItem(key);
+        }
+        window.location.href = "index.html";
+    } catch (error) {
+        showProjectTreeError("A new project could not be started in this browser.", error);
+    }
+});
 
 for (const field of projectFields) {
     field.addEventListener("input", () => {
