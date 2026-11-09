@@ -123,7 +123,7 @@
         .quote-layout {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            align-items: start;
+            align-items: stretch;
             gap: 16px;
         }
 
@@ -171,6 +171,26 @@
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 18px 24px;
+        }
+
+        .project-panel {
+            font-size: .9rem;
+        }
+
+        .project-panel form {
+            gap: 10px 14px;
+        }
+
+        .project-panel label {
+            margin-bottom: 3px;
+            font-size: .9rem;
+        }
+
+        .project-panel input,
+        .project-panel select {
+            min-height: 34px;
+            padding: 6px 8px;
+            font-size: .9rem;
         }
 
         .field {
@@ -589,9 +609,9 @@
                 <option value="100">100%</option>
             </select>
         </div>
-        <div class="field field-wide">
+        <div class="field">
             <label for="probability-comment">Prob. comment</label>
-            <textarea id="probability-comment" name="probabilityComment"></textarea>
+            <input id="probability-comment" name="probabilityComment" type="text">
         </div>
         <div class="field">
             <label for="bid-status">Bid Status</label>
@@ -604,13 +624,9 @@
                 <option>Lost</option>
             </select>
         </div>
-        <div class="field field-wide">
+        <div class="field">
             <label for="bid-status-comment">Bid Status cmt.</label>
-            <textarea id="bid-status-comment" name="bidStatusComment"></textarea>
-        </div>
-        <div class="field field-wide">
-            <label for="opportunity-number">Opportunity #</label>
-            <input id="opportunity-number" name="opportunityNumber" type="text">
+            <input id="bid-status-comment" name="bidStatusComment" type="text">
         </div>
                 <p id="form-error" role="alert" hidden></p>
             </form>
