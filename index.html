@@ -47,13 +47,18 @@
             list-style: none;
         }
 
+        .project-tree-item {
+            display: grid;
+            gap: 5px;
+        }
+
         .project-tree-new {
             width: 100%;
             margin: 0 0 12px;
             padding: 9px;
         }
 
-        .project-tree-list button {
+        .project-tree-select {
             display: block;
             width: 100%;
             margin: 0;
@@ -66,16 +71,48 @@
             overflow-wrap: anywhere;
         }
 
-        .project-tree-list button:hover {
+        .project-tree-select:hover {
             border-color: #004f9f;
             background: #dceeff;
             color: #263746;
         }
 
-        .project-tree-list button[aria-current="true"] {
+        .project-tree-select[aria-current="true"] {
             border-color: #004f9f;
             background: #dceeff;
             box-shadow: inset 3px 0 #004f9f;
+        }
+
+        .project-tree-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 4px;
+        }
+
+        .project-tree-actions button,
+        .project-tree-archive-toggle {
+            margin: 0;
+            padding: 6px 4px;
+            font-size: .78rem;
+        }
+
+        .project-tree-actions button:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
+        .project-tree-archive-toggle {
+            width: 100%;
+            margin: 8px 0;
+        }
+
+        .project-tree-archived[hidden] {
+            display: none;
+        }
+
+        .project-tree-archived h3 {
+            margin: 12px 0 8px;
+            font-size: .95rem;
         }
 
         .project-tree-meta {
@@ -528,6 +565,11 @@
     <h2 id="project-tree-heading">Project Tree</h2>
     <button id="new-project" class="project-tree-new" type="button">New Project</button>
     <ul id="project-tree-list" class="project-tree-list"></ul>
+    <button id="project-tree-archive-toggle" class="project-tree-archive-toggle" type="button" aria-expanded="false" aria-controls="project-tree-archived" hidden>Show archived projects</button>
+    <section id="project-tree-archived" class="project-tree-archived" aria-labelledby="project-tree-archived-heading" hidden>
+        <h3 id="project-tree-archived-heading">Archived Projects</h3>
+        <ul id="project-tree-archived-list" class="project-tree-list"></ul>
+    </section>
     <p id="project-tree-status" role="status">No projects added yet.</p>
 </aside>
 <main>
@@ -687,6 +729,9 @@ const projectForm = document.getElementById("project-form");
 const projectFields = [...projectForm.elements].filter(element => element.name);
 const formError = document.getElementById("form-error");
 const projectTreeList = document.getElementById("project-tree-list");
+const archivedProjectTreeList = document.getElementById("project-tree-archived-list");
+const archivedProjectTreeSection = document.getElementById("project-tree-archived");
+const archivedProjectTreeToggle = document.getElementById("project-tree-archive-toggle");
 const projectTreeStatus = document.getElementById("project-tree-status");
 const addToProjectTreeButton = document.getElementById("add-to-project-tree");
 const newProjectButton = document.getElementById("new-project");
@@ -893,6 +938,7 @@ function getProjectSnapshot(id = activeProjectId) {
         unitRows: getUnitData(),
         quotedUnits: JSON.parse(JSON.stringify(quotedUnits)),
         costMultiplier,
+        archived: projectTreeProjects.find(project => project.id === id)?.archived === true,
         updatedAt: new Date().toISOString()
     };
 }
@@ -953,31 +999,142 @@ function activateProject(project) {
 
 function renderProjectTree() {
     projectTreeList.replaceChildren();
+    archivedProjectTreeList.replaceChildren();
     addToProjectTreeButton.textContent = activeProjectId
         ? "Save changes to project Tree"
         : "Add to project Tree";
-    projectTreeStatus.textContent = projectTreeProjects.length
-        ? `${projectTreeProjects.length} project${projectTreeProjects.length === 1 ? "" : "s"}`
-        : "No projects added yet.";
+    const activeProjects = projectTreeProjects.filter(project => !project.archived);
+    const archivedProjects = projectTreeProjects.filter(project => project.archived);
+    if (archivedProjects.length === 0) {
+        archivedProjectTreeToggle.setAttribute("aria-expanded", "false");
+    }
+    projectTreeStatus.textContent = activeProjects.length
+        ? `${activeProjects.length} project${activeProjects.length === 1 ? "" : "s"}`
+        : archivedProjects.length ? "No active projects." : "No projects added yet.";
+    archivedProjectTreeToggle.hidden = archivedProjects.length === 0;
+    archivedProjectTreeToggle.textContent =
+        `${archivedProjectTreeToggle.getAttribute("aria-expanded") === "true" ? "Hide" : "Show"} archived projects (${archivedProjects.length})`;
+    archivedProjectTreeSection.hidden =
+        archivedProjects.length === 0 || archivedProjectTreeToggle.getAttribute("aria-expanded") !== "true";
 
-    for (const project of projectTreeProjects) {
-        const item = document.createElement("li");
-        const button = document.createElement("button");
-        button.type = "button";
-        button.setAttribute("aria-current", String(project.id === activeProjectId));
-        button.append(document.createTextNode(getProjectTreeName(project)));
+    for (const [projects, list, isArchived] of [
+        [activeProjects, projectTreeList, false],
+        [archivedProjects, archivedProjectTreeList, true]
+    ]) {
+        for (const [index, project] of projects.entries()) {
+            const projectName = getProjectTreeName(project);
+            const item = document.createElement("li");
+            item.className = "project-tree-item";
+            const selectButton = document.createElement("button");
+            selectButton.type = "button";
+            selectButton.className = "project-tree-select";
+            selectButton.setAttribute("aria-current", String(project.id === activeProjectId));
+            selectButton.append(document.createTextNode(projectName));
 
-        const metadata = document.createElement("span");
-        metadata.className = "project-tree-meta";
-        metadata.textContent = project.project?.quoteNumber
-            ? `Quote #${project.project.quoteNumber}`
-            : "Project";
-        button.append(metadata);
-        button.addEventListener("click", () => {
-            if (project.id !== activeProjectId) activateProject(project);
-        });
-        item.append(button);
-        projectTreeList.append(item);
+            const metadata = document.createElement("span");
+            metadata.className = "project-tree-meta";
+            metadata.textContent = project.project?.quoteNumber
+                ? `Quote #${project.project.quoteNumber}`
+                : "Project";
+            selectButton.append(metadata);
+            selectButton.addEventListener("click", () => {
+                if (project.id !== activeProjectId) activateProject(project);
+            });
+            item.append(selectButton);
+
+            const actions = document.createElement("div");
+            actions.className = "project-tree-actions";
+            if (!isArchived) {
+                const upButton = document.createElement("button");
+                upButton.type = "button";
+                upButton.textContent = "Up";
+                upButton.setAttribute("aria-label", `Move ${projectName} up`);
+                upButton.disabled = index === 0;
+                upButton.addEventListener("click", () => moveProject(project.id, -1));
+
+                const downButton = document.createElement("button");
+                downButton.type = "button";
+                downButton.textContent = "Down";
+                downButton.setAttribute("aria-label", `Move ${projectName} down`);
+                downButton.disabled = index === projects.length - 1;
+                downButton.addEventListener("click", () => moveProject(project.id, 1));
+                actions.append(upButton, downButton);
+            }
+
+            const archiveButton = document.createElement("button");
+            archiveButton.type = "button";
+            archiveButton.textContent = isArchived ? "Restore" : "Archive";
+            archiveButton.setAttribute("aria-label", `${isArchived ? "Restore" : "Archive"} ${projectName}`);
+            archiveButton.addEventListener("click", () =>
+                setProjectArchived(project.id, !isArchived)
+            );
+
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.textContent = "Delete";
+            deleteButton.setAttribute("aria-label", `Delete ${projectName}`);
+            deleteButton.addEventListener("click", () => deleteProject(project));
+            actions.append(archiveButton, deleteButton);
+            item.append(actions);
+            list.append(item);
+        }
+    }
+}
+
+function saveTreeMutation(previousProjects) {
+    if (saveProjectTree()) {
+        renderProjectTree();
+        return true;
+    }
+
+    projectTreeProjects = previousProjects;
+    renderProjectTree();
+    return false;
+}
+
+function moveProject(projectId, direction) {
+    const activeProjects = projectTreeProjects.filter(project => !project.archived);
+    const archivedProjects = projectTreeProjects.filter(project => project.archived);
+    const index = activeProjects.findIndex(project => project.id === projectId);
+    const destination = index + direction;
+    if (index < 0 || destination < 0 || destination >= activeProjects.length) return;
+
+    const previousProjects = projectTreeProjects;
+    [activeProjects[index], activeProjects[destination]] =
+        [activeProjects[destination], activeProjects[index]];
+    projectTreeProjects = [...activeProjects, ...archivedProjects];
+    saveTreeMutation(previousProjects);
+}
+
+function setProjectArchived(projectId, archived) {
+    const previousProjects = projectTreeProjects;
+    if (!projectTreeProjects.some(item => item.id === projectId)) return;
+
+    projectTreeProjects = projectTreeProjects.map(item =>
+        item.id === projectId ? { ...item, archived } : item
+    );
+    projectTreeProjects = [
+        ...projectTreeProjects.filter(item => !item.archived),
+        ...projectTreeProjects.filter(item => item.archived)
+    ];
+    saveTreeMutation(previousProjects);
+}
+
+function deleteProject(project) {
+    if (!window.confirm(`Permanently delete "${getProjectTreeName(project)}"?`)) return;
+
+    const previousProjects = projectTreeProjects;
+    projectTreeProjects = projectTreeProjects.filter(item => item.id !== project.id);
+    if (!saveTreeMutation(previousProjects)) return;
+
+    if (project.id === activeProjectId) {
+        activeProjectId = null;
+        try {
+            sessionStorage.removeItem("selectsgs-active-project-id");
+        } catch (error) {
+            showProjectTreeError("The project was deleted, but its active-project marker could not be cleared.", error);
+        }
+        renderProjectTree();
     }
 }
 
@@ -991,7 +1148,7 @@ function loadProjectTree() {
             }
             projectTreeProjects = parsedProjects.filter(project =>
                 project && typeof project.id === "string" && project.project && typeof project.project === "object"
-            );
+            ).map(project => ({ ...project, archived: project.archived === true }));
         }
     } catch (error) {
         showProjectTreeError("The Project Tree could not be loaded from this browser.", error);
@@ -999,6 +1156,12 @@ function loadProjectTree() {
 
     renderProjectTree();
 }
+
+archivedProjectTreeToggle.addEventListener("click", () => {
+    const isExpanded = archivedProjectTreeToggle.getAttribute("aria-expanded") === "true";
+    archivedProjectTreeToggle.setAttribute("aria-expanded", String(!isExpanded));
+    renderProjectTree();
+});
 
 function saveProjectData() {
     try {
