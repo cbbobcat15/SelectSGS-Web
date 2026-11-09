@@ -22,4 +22,4 @@ Create a modern web-based configurator, pricing, and quoting platform for SGS Pr
 
 **Current workflow**
 
-Open `index.html` to enter project information. Once the required details are complete, an eight-row unit list appears; each “Click to Select” button opens `unit-selection.html` for that row. Project and row details are carried between these pages in the current browser tab.
+Open `index.html` to enter project information. Once the required details are complete, an eight-row unit list appears; each “Click to Select” button opens `unit-selection.html` for that row. Click a matching unit to highlight it, then choose “Add to Quote” to return to the project information page. Added units default to $1.00 and their specifications appear beside the unit list. Project and row details are carried between these pages in the current browser tab.

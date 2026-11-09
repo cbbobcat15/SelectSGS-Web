@@ -55,6 +55,28 @@
             background-color: #003a75;
         }
 
+        .action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-top: 25px;
+        }
+
+        .action-bar button {
+            margin-top: 0;
+        }
+
+        #add-to-quote {
+            margin-left: auto;
+        }
+
+        #add-to-quote:disabled {
+            background: #8797a5;
+            cursor: not-allowed;
+        }
+
         .result {
             margin-top: 30px;
             padding: 20px;
@@ -74,6 +96,25 @@
             border-bottom: 1px solid #9aa8b5;
             padding: 8px;
             text-align: center;
+        }
+
+        tbody tr {
+            cursor: pointer;
+        }
+
+        tbody tr:hover {
+            background: #eef5ff;
+        }
+
+        tbody tr[aria-selected="true"] {
+            background: #cce2f8;
+            outline: 2px solid #004f9f;
+            outline-offset: -2px;
+        }
+
+        tbody tr:focus-visible {
+            outline: 2px solid #004f9f;
+            outline-offset: -2px;
         }
 
         thead th {
@@ -187,9 +228,10 @@
     <label>Lower Capacity Tolerance (%)</label>
     <input id="Lower Tolerance" type="number" value="-10" min="-100" max="0" step="any">
 
-    <button onclick="findUnit()">
-        Find Unit
-    </button>
+    <div class="action-bar">
+        <button type="button" onclick="findUnit()">Find Unit</button>
+        <button id="add-to-quote" type="button" disabled>Add to Quote</button>
+    </div>
 
     <div id="result" class="result">
         Enter design conditions and click Find Unit.
@@ -479,6 +521,8 @@ let matchingUnits = [];
 let sortKey = "capacityPercent";
 let sortDirection = "asc";
 let currentResultDetails;
+let selectedUnitModel = null;
+const quoteUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
 
 const resultColumns = [
     { key: "model", label: "Model", type: "string" },
@@ -524,30 +568,94 @@ function renderMatchingUnits(result) {
                     return `<th scope="col" aria-sort="${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button type="button" data-sort-key="${item.key}" aria-label="Sort by ${item.label}, ${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "ascending"}">${heading}${indicator}</button></th>`;
                 }).join("")}</tr></thead>
                 <tbody>${sortedUnits.map(unit =>
-                    `<tr><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
+                    `<tr data-unit-model="${unit.model}" tabindex="0" aria-selected="${unit.model === selectedUnitModel}"><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
                 ).join("")}</tbody>
             </table>`
             : "<p>No units match the selected capacity range.</p>"}
     `;
+    document.getElementById("add-to-quote").disabled =
+        !selectedUnitModel || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8;
 }
 
 document.getElementById("result").addEventListener("click", event => {
     const button = event.target.closest("button[data-sort-key]");
-    if (!button) return;
+    if (button) {
+        const selectedKey = button.dataset.sortKey;
+        if (selectedKey === sortKey) {
+            sortDirection = sortDirection === "asc" ? "desc" : "asc";
+        } else {
+            sortKey = selectedKey;
+            sortDirection = "asc";
+        }
 
-    const selectedKey = button.dataset.sortKey;
-    if (selectedKey === sortKey) {
-        sortDirection = sortDirection === "asc" ? "desc" : "asc";
-    } else {
-        sortKey = selectedKey;
-        sortDirection = "asc";
+        renderMatchingUnits(document.getElementById("result"));
+        return;
     }
 
+    const row = event.target.closest("tbody tr[data-unit-model]");
+    if (row) selectMatchingUnit(row.dataset.unitModel);
+});
+
+document.getElementById("result").addEventListener("keydown", event => {
+    if ((event.key === "Enter" || event.key === " ") &&
+        event.target.matches("tbody tr[data-unit-model]")) {
+        event.preventDefault();
+        selectMatchingUnit(event.target.dataset.unitModel);
+    }
+});
+
+for (const input of document.querySelectorAll("#Capacity, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance")) {
+    for (const eventName of ["input", "change"]) {
+        input.addEventListener(eventName, () => {
+            if (!selectedUnitModel) return;
+            selectedUnitModel = null;
+            if (currentResultDetails) renderMatchingUnits(document.getElementById("result"));
+        });
+    }
+}
+
+function selectMatchingUnit(model) {
+    selectedUnitModel = model;
     renderMatchingUnits(document.getElementById("result"));
+}
+
+document.getElementById("add-to-quote").addEventListener("click", () => {
+    const selectedUnit = matchingUnits.find(unit => unit.model === selectedUnitModel);
+    if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+        return;
+    }
+
+    try {
+        const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
+        const unitRows = JSON.parse(sessionStorage.getItem("selectsgs-unit-rows") || "[]");
+        const unitRow = unitRows[quoteUnitNumber - 1] || {};
+        savedUnits[quoteUnitNumber] = {
+            ...selectedUnit,
+            price: 1,
+            refrigerant: document.getElementById("Refrigerant").value,
+            motorVoltage: document.getElementById("Motor Voltage").value,
+            requiredCapacity: Number(document.getElementById("Capacity").value),
+            condensingTemperature: Number(document.getElementById("Condensing Temperature").value),
+            wetBulbTemperature: Number(document.getElementById("Wet Bulb Temperature").value),
+            location: unitRow.location || "",
+            tag: unitRow.tag || ""
+        };
+        sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(savedUnits));
+        window.location.href = `index.html?unit=${quoteUnitNumber}&added=1`;
+    } catch (error) {
+        const result = document.getElementById("result");
+        const message = document.createElement("p");
+        message.setAttribute("role", "alert");
+        message.textContent = "The selected unit could not be added to the quote. Check your browser storage settings and try again.";
+        result.prepend(message);
+        console.error("Could not save selected unit to quote.", error);
+    }
 });
 
 function findUnit() {
 
+    selectedUnitModel = null;
+    document.getElementById("add-to-quote").disabled = true;
     const capacity = Number(document.getElementById("Capacity").value);
     const condensingTemperatureInput = document.getElementById("Condensing Temperature").value;
     const wetBulbTemperatureInput = document.getElementById("Wet Bulb Temperature").value;
@@ -588,6 +696,7 @@ function findUnit() {
             unit.correctedHor <= maximumCapacity
         );
 
+    selectedUnitModel = null;
     sortKey = "capacityPercent";
     sortDirection = "asc";
     currentResultDetails = { minimumCapacity, maximumCapacity, correctionFactor };

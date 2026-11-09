@@ -117,6 +117,13 @@
             color: #004f9f;
         }
 
+        .unit-list-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(260px, .7fr);
+            align-items: start;
+            gap: 20px;
+        }
+
         .unit-table-wrapper {
             overflow-x: auto;
         }
@@ -146,7 +153,8 @@
 
         .unit-list th:last-child,
         .unit-list td:last-child {
-            width: 120px;
+            width: 100px;
+            text-align: right;
         }
 
         .unit-list td:first-child {
@@ -183,6 +191,33 @@
             color: #003a75;
         }
 
+        .unit-details {
+            padding: 18px;
+            border-left: 5px solid #004f9f;
+            background: #eef5ff;
+        }
+
+        .unit-details h3 {
+            margin: 0 0 14px;
+            color: #004f9f;
+        }
+
+        .unit-details dl {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+            gap: 10px 14px;
+            margin: 0;
+        }
+
+        .unit-details dt {
+            font-weight: bold;
+        }
+
+        .unit-details dd {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 12px;
@@ -201,6 +236,10 @@
             button,
             #form-error {
                 grid-column: auto;
+            }
+
+            .unit-list-layout {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -288,22 +327,29 @@
 
     <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
         <h2 id="unit-list-heading">Select Units</h2>
-        <div class="unit-table-wrapper">
-            <table>
-                <thead>
-                    <tr><th scope="col">#</th><th scope="col">Location</th><th scope="col">Unit Tag</th><th scope="col">Unit Type</th></tr>
-                </thead>
-                <tbody>
-                    <tr data-unit-row="1"><th scope="row">1</th><td><input data-unit-field="location" aria-label="Location for unit 1"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 1"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="2"><th scope="row">2</th><td><input data-unit-field="location" aria-label="Location for unit 2"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 2"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="3"><th scope="row">3</th><td><input data-unit-field="location" aria-label="Location for unit 3"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 3"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="4"><th scope="row">4</th><td><input data-unit-field="location" aria-label="Location for unit 4"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 4"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="5"><th scope="row">5</th><td><input data-unit-field="location" aria-label="Location for unit 5"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 5"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="6"><th scope="row">6</th><td><input data-unit-field="location" aria-label="Location for unit 6"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 6"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="7"><th scope="row">7</th><td><input data-unit-field="location" aria-label="Location for unit 7"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 7"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                    <tr data-unit-row="8"><th scope="row">8</th><td><input data-unit-field="location" aria-label="Location for unit 8"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 8"></td><td><button class="select-unit" type="button">Click to Select</button></td></tr>
-                </tbody>
-            </table>
+        <div class="unit-list-layout">
+            <div class="unit-table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th scope="col">#</th><th scope="col">Location</th><th scope="col">Unit Tag</th><th scope="col">Unit Type</th><th scope="col">Unit Price</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr data-unit-row="1"><th scope="row">1</th><td><input data-unit-field="location" aria-label="Location for unit 1"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 1"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="2"><th scope="row">2</th><td><input data-unit-field="location" aria-label="Location for unit 2"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 2"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="3"><th scope="row">3</th><td><input data-unit-field="location" aria-label="Location for unit 3"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 3"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="4"><th scope="row">4</th><td><input data-unit-field="location" aria-label="Location for unit 4"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 4"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="5"><th scope="row">5</th><td><input data-unit-field="location" aria-label="Location for unit 5"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 5"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="6"><th scope="row">6</th><td><input data-unit-field="location" aria-label="Location for unit 6"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 6"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="7"><th scope="row">7</th><td><input data-unit-field="location" aria-label="Location for unit 7"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 7"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                        <tr data-unit-row="8"><th scope="row">8</th><td><input data-unit-field="location" aria-label="Location for unit 8"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 8"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <aside id="unit-details" class="unit-details" aria-labelledby="unit-details-heading">
+                <h3 id="unit-details-heading">Selected Line Item</h3>
+                <p id="unit-details-empty">Add a unit to a quote to see its specifications here.</p>
+                <dl id="unit-details-list" hidden></dl>
+            </aside>
         </div>
     </section>
 </main>
@@ -313,6 +359,59 @@ const projectFields = [...projectForm.elements].filter(element => element.name);
 const formError = document.getElementById("form-error");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
+let quotedUnits = {};
+const requestedUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
+const activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= 8
+    ? requestedUnitNumber
+    : null;
+
+function formatCurrency(value) {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(value);
+}
+
+function renderUnitDetails(unitNumber) {
+    const unit = quotedUnits[unitNumber];
+    const unitRow = unitRows[unitNumber - 1];
+    const details = document.getElementById("unit-details-list");
+    const emptyMessage = document.getElementById("unit-details-empty");
+    details.replaceChildren();
+
+    if (!unit) {
+        details.hidden = true;
+        emptyMessage.hidden = false;
+        return;
+    }
+
+    const fields = [
+        ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
+        ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
+        ["Model", unit.model],
+        ["Unit price", formatCurrency(unit.price)],
+        ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
+        ["Capacity match", `${unit.capacityPercent.toFixed(1)}%`],
+        ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
+        ["Corrected HOR", `${unit.correctedHor.toLocaleString()} MBH`],
+        ["Refrigerant", unit.refrigerant],
+        ["Motor voltage", unit.motorVoltage],
+        ["Fan motor", `${unit.fanMotor} HP`],
+        ["Air flow", `${unit.airFlowCfm?.toLocaleString() ?? "N/A"} CFM`],
+        ["Internal coil volume", `${unit.internalCoilVolume ?? "N/A"} ft³`],
+        ["R717 charge", `${unit.r717ChargeLb ?? "N/A"} lb`],
+        ["Condensing temperature", `${unit.condensingTemperature} °F`],
+        ["Wet bulb temperature", `${unit.wetBulbTemperature} °F`]
+    ];
+
+    for (const [label, value] of fields) {
+        const term = document.createElement("dt");
+        term.textContent = label;
+        const description = document.createElement("dd");
+        description.textContent = value ?? "—";
+        details.append(term, description);
+    }
+
+    emptyMessage.hidden = true;
+    details.hidden = false;
+}
 
 function getProjectData() {
     return Object.fromEntries(new FormData(projectForm).entries());
@@ -366,6 +465,11 @@ try {
             });
         }
     }
+
+    const savedQuotedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
+    if (savedQuotedUnits && typeof savedQuotedUnits === "object" && !Array.isArray(savedQuotedUnits)) {
+        quotedUnits = savedQuotedUnits;
+    }
 } catch (error) {
     formError.textContent = "Saved project information could not be loaded. You can still enter the details again.";
     formError.hidden = false;
@@ -384,9 +488,27 @@ for (const field of projectFields) {
 }
 
 for (const row of unitRows) {
+    const unitNumber = row.dataset.unitRow;
+    const quotedUnit = quotedUnits[unitNumber];
+    if (quotedUnit) {
+        row.querySelector("[data-unit-price]").textContent = formatCurrency(quotedUnit.price);
+        row.querySelector(".select-unit").textContent = "Change Unit";
+    }
+
+    row.addEventListener("click", event => {
+        if (event.target.closest("input, button")) return;
+        renderUnitDetails(unitNumber);
+    });
+
     for (const field of row.querySelectorAll("[data-unit-field]")) {
-        field.addEventListener("input", saveProjectData);
-        field.addEventListener("change", saveProjectData);
+        field.addEventListener("input", () => {
+            saveProjectData();
+            if (Number(activeUnitNumber) === Number(unitNumber)) renderUnitDetails(unitNumber);
+        });
+        field.addEventListener("change", () => {
+            saveProjectData();
+            if (Number(activeUnitNumber) === Number(unitNumber)) renderUnitDetails(unitNumber);
+        });
     }
 
     row.querySelector(".select-unit").addEventListener("click", () => {
@@ -399,6 +521,10 @@ for (const row of unitRows) {
         const unitNumber = row.dataset.unitRow;
         window.location.href = `unit-selection.html?unit=${unitNumber}`;
     });
+}
+
+if (activeUnitNumber) {
+    renderUnitDetails(activeUnitNumber);
 }
 
 updateUnitList();
