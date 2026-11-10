@@ -9,11 +9,6 @@
     });
 
     const spreadsheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-    const templateDatabaseName = "selectsgs-quote-template";
-    const templateStoreName = "templates";
-    let customTemplate = null;
-    let templateRestorePromise = null;
-    let templateRestoreError = null;
 
     function parseWorksheet(xml) {
         const document = new DOMParser().parseFromString(xml, "application/xml");
@@ -74,47 +69,6 @@
         const cell = row && findCell(row, reference);
         if (!cell) throw new Error(`The quote template is missing cell ${reference}.`);
         writeCell(cell, value);
-    }
-
-    function normalizeQuoteTemplate(sheet, totalRow) {
-        const sheetData = getSheetData(sheet);
-        const previousTotalRow = Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))
-            .find(row => {
-                const rowNumber = Number(row.getAttribute("r"));
-                return rowNumber >= 63 &&
-                    !["A", "B", "I"].some(column => findCell(row, `${column}${rowNumber}`)?.textContent.trim()) &&
-                    Boolean(findCell(row, `K${rowNumber}`)?.textContent.trim());
-            });
-        if (!previousTotalRow) {
-            throw new Error("The quote template is missing its formatted total row.");
-        }
-
-        const previousTotalRowNumber = Number(previousTotalRow.getAttribute("r"));
-        for (const row of Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))) {
-            const rowNumber = Number(row.getAttribute("r"));
-            if (rowNumber < 13 || rowNumber >= previousTotalRowNumber) continue;
-            for (const cell of row.getElementsByTagNameNS(spreadsheetNamespace, "c")) {
-                writeCell(cell, "");
-            }
-        }
-
-        if (totalRow < previousTotalRowNumber) {
-            for (const row of Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))) {
-                const rowNumber = Number(row.getAttribute("r"));
-                if (rowNumber >= totalRow && rowNumber < previousTotalRowNumber) row.remove();
-            }
-            const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
-            if (mergeCells) {
-                for (const merge of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
-                    const firstRow = Number(merge.getAttribute("ref").match(/\d+/)?.[0]);
-                    if (firstRow >= totalRow && firstRow < previousTotalRowNumber) merge.remove();
-                }
-                mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
-            }
-        }
-        if (previousTotalRowNumber !== totalRow) {
-            shiftRows(sheet, previousTotalRowNumber, totalRow - previousTotalRowNumber);
-        }
     }
 
     function shiftReference(reference, startRow, offset) {
@@ -182,6 +136,13 @@
     function makeQuoteSheet(templateXml, project, units, exportDate) {
         const sheet = parseWorksheet(templateXml);
         const sheetData = getSheetData(sheet);
+        const projectCells = [
+            [7, "C7", project.customer], [7, "I7", project.contact],
+            [8, "C8", project.projectName], [8, "I8", project.preparedBy],
+            [9, "C9", project.quoteNumber], [9, "I9", exportDate]
+        ];
+        for (const [row, cell, value] of projectCells) setCellValue(sheetData, row, cell, value);
+
         const lines = [];
         for (const unit of units) {
             const basePrice = Number(unit.baseNetPrice) || 0;
@@ -204,14 +165,7 @@
         }
 
         const totalRow = Math.max(63, 14 + lines.length);
-        normalizeQuoteTemplate(sheet, totalRow);
-        const projectCells = [
-            [7, "C7", project.customer], [7, "I7", project.contact],
-            [8, "C8", project.projectName], [8, "I8", project.preparedBy],
-            [9, "C9", project.quoteNumber], [9, "I9", exportDate]
-        ];
-        for (const [row, cell, value] of projectCells) setCellValue(sheetData, row, cell, value);
-
+        shiftRows(sheet, 63, totalRow - 63);
         for (let index = 0; index < Math.max(3, lines.length); index++) {
             const rowNumber = 13 + index;
             addQuoteLine(sheet, rowNumber, lines[index] ?? {
@@ -300,25 +254,6 @@
 
     function makeItemEcSheet(templateXml, project, units) {
         const sheet = parseWorksheet(templateXml);
-        const sheetData = getSheetData(sheet);
-        for (const row of Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))) {
-            if (Number(row.getAttribute("r")) > 45) row.remove();
-        }
-        const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
-        if (mergeCells) {
-            for (const merge of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
-                if (Number(merge.getAttribute("ref").match(/\d+/)?.[0]) > 45) merge.remove();
-            }
-            mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
-        }
-        const rowBreaks = sheet.getElementsByTagNameNS(spreadsheetNamespace, "rowBreaks")[0];
-        if (rowBreaks) {
-            for (const pageBreak of Array.from(rowBreaks.getElementsByTagNameNS(spreadsheetNamespace, "brk"))) {
-                pageBreak.remove();
-            }
-            rowBreaks.setAttribute("count", "0");
-            rowBreaks.setAttribute("manualBreakCount", "0");
-        }
         units.forEach((unit, index) => {
             const offset = index * 48;
             if (offset) cloneItemPage(sheet, offset);
@@ -416,134 +351,6 @@
         return new TextDecoder().decode(bytes);
     }
 
-    async function validateTemplate(buffer) {
-        const files = readZipEntries(buffer);
-        const quoteSheet = files.find(file => file.name === "xl/worksheets/sheet1.xml");
-        const itemSheet = files.find(file => file.name === "xl/worksheets/sheet2.xml");
-        if (!quoteSheet || !itemSheet) {
-            throw new Error("The Excel template must contain the Quote Page 0 and Item EC worksheets.");
-        }
-
-        makeQuoteSheet(
-            await readZipEntryText(quoteSheet),
-            { customer: "", contact: "", projectName: "", preparedBy: "", quoteNumber: "" },
-            [],
-            new Date().toISOString().slice(0, 10)
-        );
-        makeItemEcSheet(await readZipEntryText(itemSheet), {}, [{
-            location: "", tag: "", requiredCapacity: 0, condensingTemperature: 0,
-            wetBulbTemperature: 0, refrigerant: "", correctedHor: 0, fanMotor: "",
-            model: "", motorVoltage: "", r717ChargeLb: 0, airFlowCfm: 0
-        }]);
-        return files;
-    }
-
-    function openTemplateDatabase() {
-        if (!window.indexedDB) {
-            return Promise.reject(new Error("This browser does not support persistent quote templates."));
-        }
-
-        return new Promise((resolve, reject) => {
-            const request = window.indexedDB.open(templateDatabaseName, 1);
-            request.onupgradeneeded = () => {
-                request.result.createObjectStore(templateStoreName);
-            };
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error ?? new Error("The quote template storage could not be opened."));
-            request.onblocked = () => reject(new Error("Quote template storage is busy in another browser tab. Close other tabs and try again."));
-        });
-    }
-
-    async function readStoredTemplate() {
-        const database = await openTemplateDatabase();
-        try {
-            return await new Promise((resolve, reject) => {
-                const transaction = database.transaction(templateStoreName, "readonly");
-                const request = transaction.objectStore(templateStoreName).get("active");
-                let record = null;
-                request.onsuccess = () => { record = request.result ?? null; };
-                request.onerror = () => reject(request.error ?? new Error("The saved quote template could not be read."));
-                transaction.oncomplete = () => resolve(record);
-                transaction.onerror = () => reject(transaction.error ?? new Error("The saved quote template could not be read."));
-                transaction.onabort = () => reject(transaction.error ?? new Error("Reading the saved quote template was interrupted."));
-            });
-        } finally {
-            database.close();
-        }
-    }
-
-    async function writeStoredTemplate(record) {
-        const database = await openTemplateDatabase();
-        try {
-            await new Promise((resolve, reject) => {
-                const transaction = database.transaction(templateStoreName, "readwrite");
-                transaction.objectStore(templateStoreName).put(record, "active");
-                transaction.oncomplete = resolve;
-                transaction.onerror = () => reject(transaction.error ?? new Error("The quote template could not be saved."));
-                transaction.onabort = () => reject(transaction.error ?? new Error("Saving the quote template was interrupted."));
-            });
-        } finally {
-            database.close();
-        }
-    }
-
-    async function deleteStoredTemplate() {
-        const database = await openTemplateDatabase();
-        try {
-            await new Promise((resolve, reject) => {
-                const transaction = database.transaction(templateStoreName, "readwrite");
-                transaction.objectStore(templateStoreName).delete("active");
-                transaction.oncomplete = resolve;
-                transaction.onerror = () => reject(transaction.error ?? new Error("The saved quote template could not be removed."));
-                transaction.onabort = () => reject(transaction.error ?? new Error("Removing the saved quote template was interrupted."));
-            });
-        } finally {
-            database.close();
-        }
-    }
-
-    function loadSavedQuoteTemplate() {
-        templateRestorePromise = readStoredTemplate().then(async record => {
-            if (!record) {
-                customTemplate = null;
-                templateRestoreError = null;
-                return null;
-            }
-            if (typeof record.name !== "string" || !(record.buffer instanceof ArrayBuffer)) {
-                throw new Error("The saved quote template is damaged. Upload it again or switch to the standard template.");
-            }
-            await validateTemplate(record.buffer);
-            customTemplate = { name: record.name, buffer: record.buffer };
-            templateRestoreError = null;
-            return { name: record.name };
-        }).catch(error => {
-            templateRestoreError = error;
-            throw error;
-        });
-        return templateRestorePromise;
-    }
-
-    async function saveQuoteTemplate(file) {
-        if (!file || !/\.xlsx$/i.test(file.name)) {
-            throw new Error("Choose an Excel workbook with the .xlsx extension.");
-        }
-        const buffer = await file.arrayBuffer();
-        await validateTemplate(buffer);
-        const record = { name: file.name, buffer };
-        await writeStoredTemplate(record);
-        customTemplate = record;
-        templateRestoreError = null;
-        templateRestorePromise = Promise.resolve({ name: file.name });
-        return { name: file.name };
-    }
-
-    async function resetQuoteTemplate() {
-        await deleteStoredTemplate();
-        customTemplate = null;
-        templateRestoreError = null;
-        templateRestorePromise = Promise.resolve(null);
-    }
-
     function zipFiles(files) {
         const localParts = [];
         const centralParts = [];
@@ -612,22 +419,15 @@
         if (!Array.isArray(units) || units.length === 0) {
             throw new Error("Add at least one unit before exporting the quote.");
         }
-        if (templateRestorePromise) await templateRestorePromise;
-        if (templateRestoreError) throw templateRestoreError;
 
         const exportDate = new Date().toISOString().slice(0, 10);
-        let files;
-        if (customTemplate) {
-            files = readZipEntries(customTemplate.buffer);
-        } else {
-            const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-            templateUrl.searchParams.set("v", "20261110-2015");
-            const templateResponse = await fetch(templateUrl, { cache: "no-store" });
-            if (!templateResponse.ok) {
-                throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
-            }
-            files = readZipEntries(await templateResponse.arrayBuffer());
+        const templateUrl = new URL("quote-template.xlsx", document.baseURI);
+        templateUrl.searchParams.set("v", "20261110-2022");
+        const templateResponse = await fetch(templateUrl, { cache: "no-store" });
+        if (!templateResponse.ok) {
+            throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
         }
+        const files = readZipEntries(await templateResponse.arrayBuffer());
         const quoteSheet = files.find(file => file.name === "xl/worksheets/sheet1.xml");
         const itemSheet = files.find(file => file.name === "xl/worksheets/sheet2.xml");
         if (!quoteSheet || !itemSheet) {
@@ -657,7 +457,4 @@
     }
 
     window.exportQuoteWorkbook = exportQuoteWorkbook;
-    window.loadSavedQuoteTemplate = loadSavedQuoteTemplate;
-    window.saveQuoteTemplate = saveQuoteTemplate;
-    window.resetQuoteTemplate = resetQuoteTemplate;
 })();
