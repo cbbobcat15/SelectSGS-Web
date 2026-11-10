@@ -389,18 +389,64 @@
 
         .unit-details dl {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-            gap: 10px 14px;
+            grid-template-columns: minmax(0, 1fr) minmax(72px, .9fr);
+            align-content: start;
+            gap: 4px 6px;
             margin: 0;
         }
 
         .unit-details dt {
             font-weight: bold;
+            font-size: .78rem;
+            text-align: right;
         }
 
         .unit-details dd {
             margin: 0;
+            min-width: 0;
+            padding: 3px 5px;
+            border: 1px solid #9aa8b5;
+            background: #eef5ff;
             overflow-wrap: anywhere;
+            text-align: center;
+        }
+
+        .unit-specifications {
+            display: grid;
+            gap: 8px;
+        }
+
+        .unit-specifications[hidden] {
+            display: none;
+        }
+
+        .unit-detail-model {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+            align-items: center;
+            gap: 6px;
+        }
+
+        .unit-detail-model span {
+            font-weight: bold;
+            font-size: .78rem;
+            text-align: right;
+        }
+
+        .unit-detail-model strong {
+            min-width: 0;
+            padding: 3px 5px;
+            border: 1px solid #9aa8b5;
+            background: #eef5ff;
+            font-weight: normal;
+            overflow-wrap: anywhere;
+            text-align: center;
+        }
+
+        .unit-spec-columns {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
         }
 
         .options-panel h2 {
@@ -684,7 +730,7 @@
         <aside id="unit-details" class="unit-details" aria-labelledby="unit-details-heading" hidden>
             <h2 id="unit-details-heading">Selected Unit</h2>
             <p id="unit-details-empty">Add a unit to a quote to see its specifications here.</p>
-            <dl id="unit-details-list" hidden></dl>
+            <div id="unit-details-list" class="unit-specifications" hidden></div>
         </aside>
 
         <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
@@ -788,31 +834,47 @@ function renderUnitDetails(unitNumber) {
     renderOptionRows(options);
     optionsPanel.hidden = false;
 
-    const fields = [
+    const primaryFields = [
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
         ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
-        ["Model", unit.model],
         ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
         ["Capacity match", `${unit.capacityPercent.toFixed(1)}%`],
+        ["Refrigerant", unit.refrigerant],
+        ["Condensing temperature", `${unit.condensingTemperature} °F`],
+        ["Wet bulb temperature", `${unit.wetBulbTemperature} °F`]
+    ];
+    const secondaryFields = [
         ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
         ["Corrected HOR", `${unit.correctedHor.toLocaleString()} MBH`],
-        ["Refrigerant", unit.refrigerant],
         ["Motor voltage", unit.motorVoltage],
         ["Fan motor", `${unit.fanMotor} HP`],
         ["Air flow", `${unit.airFlowCfm?.toLocaleString() ?? "N/A"} CFM`],
         ["Internal coil volume", `${unit.internalCoilVolume ?? "N/A"} ft³`],
-        ["R717 charge", `${unit.r717ChargeLb ?? "N/A"} lb`],
-        ["Condensing temperature", `${unit.condensingTemperature} °F`],
-        ["Wet bulb temperature", `${unit.wetBulbTemperature} °F`]
+        ["R717 charge", `${unit.r717ChargeLb ?? "N/A"} lb`]
     ];
 
-    for (const [label, value] of fields) {
-        const term = document.createElement("dt");
-        term.textContent = label;
-        const description = document.createElement("dd");
-        description.textContent = value ?? "—";
-        details.append(term, description);
+    const model = document.createElement("div");
+    model.className = "unit-detail-model";
+    const modelLabel = document.createElement("span");
+    modelLabel.textContent = "Model";
+    const modelValue = document.createElement("strong");
+    modelValue.textContent = unit.model ?? "—";
+    model.append(modelLabel, modelValue);
+
+    const columns = document.createElement("div");
+    columns.className = "unit-spec-columns";
+    for (const fields of [primaryFields, secondaryFields]) {
+        const group = document.createElement("dl");
+        for (const [label, value] of fields) {
+            const term = document.createElement("dt");
+            term.textContent = label;
+            const description = document.createElement("dd");
+            description.textContent = value ?? "—";
+            group.append(term, description);
+        }
+        columns.append(group);
     }
+    details.append(model, columns);
 
     emptyMessage.hidden = true;
     details.hidden = false;
