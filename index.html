@@ -996,7 +996,13 @@ exportQuoteButton.addEventListener("click", () => {
                 unitNumber: Number(row.dataset.unitRow),
                 location: row.querySelector('[data-unit-field="location"]').value,
                 tag: row.querySelector('[data-unit-field="tag"]').value,
-                netPrice: getUnitLinePrice(unit)
+                baseNetPrice: (Number(unit.price) || 0) * costMultiplier,
+                options: getUnitOptions(unit)
+                    .filter(option => option.optionId)
+                    .map(option => ({
+                        ...option,
+                        netEachPrice: accessoryListPrice * costMultiplier
+                    }))
             }];
         });
         window.exportQuoteWorkbook({

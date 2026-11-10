@@ -40,14 +40,7 @@
         }
     }
 
-    function addPair(rows, merges, row, leftLabel, leftValue, rightLabel, rightValue, styles = {}) {
-        addMergedText(rows, merges, row, 1, 2, leftLabel, 3);
-        addMergedText(rows, merges, row, 3, 4, leftValue, styles.leftValue ?? 4);
-        addMergedText(rows, merges, row, 5, 6, rightLabel, 3);
-        addMergedText(rows, merges, row, 7, 8, rightValue, styles.rightValue ?? 4);
-    }
-
-    function worksheetXml(rows, merges, widths) {
+    function worksheetXml(rows, merges, widths, pageSetup = {}) {
         const rowXml = [...rows.entries()]
             .sort(([a], [b]) => a - b)
             .map(([rowNumber, cells]) => {
@@ -71,162 +64,226 @@
         const mergeXml = merges.length
             ? `<mergeCells count="${merges.length}">${merges.map(ref => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>`
             : "";
+        const rowBreaks = pageSetup.rowBreaks?.length
+            ? `<rowBreaks count="${pageSetup.rowBreaks.length}" manualBreakCount="${pageSetup.rowBreaks.length}">${pageSetup.rowBreaks.map(id => `<brk id="${id}" max="16383" man="1"/>`).join("")}</rowBreaks>`
+            : "";
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<sheetViews><sheetView workbookViewId="0"/></sheetViews>
-<sheetFormatPr defaultRowHeight="20"/>
+<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
 <cols>${cols}</cols>
 <sheetData>${rowXml}</sheetData>
 ${mergeXml}
 <pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
+<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>
+${rowBreaks}
 </worksheet>`;
     }
 
     function makeQuoteSheet(project, units, costMultiplier, exportDate) {
         const rows = new Map();
         const merges = [];
-        addMergedText(rows, merges, 1, 1, 12, "SPX Cooling Tech, LLC", 1);
-        addMergedText(rows, merges, 2, 1, 12, "827 West Progress Drive, Dixon, IL 61021", 0);
-        addMergedText(rows, merges, 3, 1, 12, "Phone (815) 284-2700   Fax (815) 288-0807", 0);
-        addMergedText(rows, merges, 5, 1, 12, "QUOTE PAGE 0 - PRICING", 2);
-
-        addMergedText(rows, merges, 6, 1, 2, "Customer", 3);
-        addMergedText(rows, merges, 6, 3, 8, project.customer, 4);
-        addMergedText(rows, merges, 6, 9, 10, "Contact", 3);
-        addMergedText(rows, merges, 6, 11, 12, project.contact, 4);
-        addMergedText(rows, merges, 7, 1, 2, "Project Name", 3);
-        addMergedText(rows, merges, 7, 3, 8, project.projectName, 4);
-        addMergedText(rows, merges, 7, 9, 10, "Prepared By", 3);
-        addMergedText(rows, merges, 7, 11, 12, project.preparedBy, 4);
-        addMergedText(rows, merges, 8, 1, 2, "Quote #", 3);
-        addMergedText(rows, merges, 8, 3, 4, project.quoteNumber, 4);
-        addMergedText(rows, merges, 8, 5, 6, "Date", 3);
-        addMergedText(rows, merges, 8, 7, 8, exportDate, 4);
-        addMergedText(rows, merges, 8, 9, 10, "Cost Multiplier", 3);
-        addMergedText(rows, merges, 8, 11, 12, costMultiplier, 4);
-
-        addMergedText(rows, merges, 10, 1, 12, "UNIT PRICING", 2);
+        addCell(rows, 1, 4, "SPX Cooling Tech, LLC", 1);
+        addCell(rows, 2, 4, "827 West Progress Drive", 0);
+        addCell(rows, 3, 4, "Dixon, IL 61021", 0);
+        addCell(rows, 4, 4, "Phone (815) 284-2700   Fax (815) 288-0807", 0);
+        addCell(rows, 7, 2, "Customer:", 3);
+        addMergedText(rows, merges, 7, 3, 6, project.customer, 4);
+        addCell(rows, 7, 8, "Contact:", 3);
+        addMergedText(rows, merges, 7, 9, 12, project.contact, 4);
+        addCell(rows, 8, 2, "Project Name:", 3);
+        addMergedText(rows, merges, 8, 3, 6, project.projectName, 4);
+        addCell(rows, 8, 8, "Prepared by:", 3);
+        addMergedText(rows, merges, 8, 9, 12, project.preparedBy, 4);
+        addCell(rows, 9, 2, "Quote #:", 3);
+        addMergedText(rows, merges, 9, 3, 6, project.quoteNumber, 4);
+        addCell(rows, 9, 8, "Date:", 3);
+        addMergedText(rows, merges, 9, 9, 12, exportDate, 4);
         addCell(rows, 11, 1, "QTY", 5);
         addMergedText(rows, merges, 11, 2, 8, "PART DESCRIPTION / NOTES", 5);
         addMergedText(rows, merges, 11, 9, 10, "NET EACH $", 5);
         addMergedText(rows, merges, 11, 11, 12, "EXTENDED $", 5);
 
+        let row = 13;
         let total = 0;
-        units.forEach((unit, index) => {
-            const row = 12 + index;
-            const linePrice = Number(unit.netPrice);
-            total += linePrice;
-            const selectedOptions = (unit.options ?? [])
-                .filter(option => option.optionId)
-                .map(option => {
-                    const name = option.optionId === "hdg-internal-service-platform"
-                        ? "HDG Internal Service Platform"
-                        : option.optionId;
-                    return `${name} (qty ${option.quantity})`;
-                });
-            const description = [
+        for (const unit of units) {
+            const basePrice = Number(unit.baseNetPrice) || 0;
+            const baseDescription = [
                 `Evaporative Condenser - ${unit.model}`,
                 unit.location ? `Location: ${unit.location}` : "",
                 unit.tag ? `Unit Tag: ${unit.tag}` : "",
-                `${Number(unit.requiredCapacity).toLocaleString()} MBH required capacity`,
-                `${unit.refrigerant} refrigerant`,
-                selectedOptions.length ? `Options: ${selectedOptions.join(", ")}` : ""
+                `${Number(unit.requiredCapacity).toLocaleString()} MBH - ${unit.refrigerant}`
             ].filter(Boolean).join(" | ");
-            addCell(rows, row, 1, 1, 4);
-            addMergedText(rows, merges, row, 2, 8, description, 4);
-            addMergedText(rows, merges, row, 9, 10, linePrice, 6);
-            addMergedText(rows, merges, row, 11, 12, linePrice, 6);
-        });
+            addCell(rows, row, 1, 1, 8);
+            addMergedText(rows, merges, row, 2, 8, baseDescription, 10);
+            addMergedText(rows, merges, row, 9, 10, basePrice, 9);
+            addMergedText(rows, merges, row, 11, 12, basePrice, 9);
+            total += basePrice;
+            row++;
 
-        const totalRow = 12 + units.length;
-        addMergedText(rows, merges, totalRow, 1, 8, "TOTAL", 7);
-        addMergedText(rows, merges, totalRow, 9, 10, "Total", 7);
-        addMergedText(rows, merges, totalRow, 11, 12, total, 7);
-        addMergedText(rows, merges, totalRow + 2, 1, 12, "Quoted price is good for 30 days; freight and taxes are not included.", 0);
-        addMergedText(rows, merges, totalRow + 3, 1, 12, "Evaporative Condenser Product: All prices FOB Dixon, IL.", 0);
-        addMergedText(rows, merges, totalRow + 4, 1, 12, "Unit specifications are listed on the Item EC tab.", 0);
-        addMergedText(rows, merges, totalRow + 5, 1, 12, "Pricing uses current app values: $1.00 unit list-price and $0.00 option-price placeholders.", 0);
-        return worksheetXml(rows, merges, [8, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13]);
+            for (const option of (unit.options ?? []).filter(item => item.optionId)) {
+                const name = option.optionId === "hdg-internal-service-platform"
+                    ? "HDG Internal Service Platform"
+                    : option.optionId;
+                const quantity = Number(option.quantity) || 1;
+                const netEach = Number(option.netEachPrice) || 0;
+                const extended = quantity * netEach;
+                addCell(rows, row, 1, quantity, 8);
+                addMergedText(rows, merges, row, 2, 8, name, 10);
+                addMergedText(rows, merges, row, 9, 10, netEach, 9);
+                addMergedText(rows, merges, row, 11, 12, extended, 9);
+                total += extended;
+                row++;
+            }
+        }
+
+        const totalRow = Math.max(63, row + 1);
+        addCell(rows, totalRow, 1, "Estimated Lead Time:", 3);
+        addCell(rows, totalRow, 4, "Select", 4);
+        addMergedText(rows, merges, totalRow, 9, 10, "Total:", 11);
+        addMergedText(rows, merges, totalRow, 11, 12, total, 12);
+        addMergedText(rows, merges, totalRow + 1, 1, 12, "Quoted price is good for 30 days from today's date; freight and taxes not included.", 0);
+        addMergedText(rows, merges, totalRow + 2, 1, 12, "Evaporative Condenser Product: All Prices FOB Dixon, IL.", 0);
+        addMergedText(rows, merges, totalRow + 3, 1, 12, "Unit specifications are listed on the Item EC tab.", 0);
+        addMergedText(rows, merges, totalRow + 4, 1, 12, "Pricing reflects the current $1.00 unit and $0.00 option list-price placeholders.", 0);
+        return worksheetXml(rows, merges, Array(12).fill(9.71));
     }
 
     function makeItemEcSheet(project, units, exportDate) {
         const rows = new Map();
         const merges = [];
-        addMergedText(rows, merges, 1, 1, 8, "SPX Cooling Tech, LLC", 1);
-        addMergedText(rows, merges, 2, 1, 8, "827 West Progress Drive, Dixon, IL 61021", 0);
-        addMergedText(rows, merges, 3, 1, 8, "Phone (815) 284-2700   Fax (815) 288-0807", 0);
-        addMergedText(rows, merges, 5, 1, 8, "EVAPORATIVE CONDENSER SPECIFICATION SHEET", 2);
-        addPair(rows, merges, 7, "Customer", project.customer, "Project Name", project.projectName);
-        addPair(rows, merges, 8, "Quote #", project.quoteNumber, "Prepared By", project.preparedBy);
-        addPair(rows, merges, 9, "Export Date", exportDate, "Contact", project.contact);
+        const rowBreaks = [];
+        const addEcField = (row, label, value, unit = "") => {
+            addMergedText(rows, merges, row, 1, 3, label, 2);
+            addCell(rows, row, 4, value ?? "N/A", 3);
+            if (unit) addCell(rows, row, 5, unit, 2);
+        };
+        const addEcPair = (row, leftLabel, leftValue, rightLabel, rightValue) => {
+            addMergedText(rows, merges, row, 1, 2, leftLabel, 2);
+            addMergedText(rows, merges, row, 3, 4, leftValue ?? "N/A", 3);
+            if (rightLabel) {
+                addMergedText(rows, merges, row, 7, 8, rightLabel, 2);
+                addMergedText(rows, merges, row, 9, 10, rightValue ?? "N/A", 3);
+            }
+        };
 
-        let row = 11;
         units.forEach((unit, index) => {
-            addMergedText(
-                rows,
-                merges,
-                row++,
-                1,
-                8,
-                `ITEM EC - UNIT ${unit.unitNumber}${unit.location ? ` - ${unit.location}` : ""}${unit.tag ? ` - ${unit.tag}` : ""}`,
-                2
-            );
-            addPair(rows, merges, row++, "Unit Location", unit.location, "Unit Tag", unit.tag);
+            const offset = index * 48;
+            const row = base => base + offset;
+            addCell(rows, row(1), 4, "SPX Cooling Tech, LLC", 1);
+            addCell(rows, row(2), 4, "827 West Progress Drive", 0);
+            addCell(rows, row(3), 4, "Dixon, IL 61021", 0);
+            addCell(rows, row(4), 4, "Phone (815) 284-2700   Fax (815) 288-0808", 0);
+            addCell(rows, row(6), 1, "Evaporative Condenser Specification Sheet", 6);
 
-            addMergedText(rows, merges, row++, 1, 8, "DESIGN CONDITIONS", 2);
-            addPair(rows, merges, row++, "Total Heat Rejection Required", unit.requiredCapacity, "Condensing Temperature", unit.condensingTemperature, {
-                leftValue: 4,
-                rightValue: 4
+            const projectFields = [
+                ["Customer:", project.customer],
+                ["Project Name:", project.projectName],
+                ["Quote #:", project.quoteNumber],
+                ["Unit Location:", unit.location],
+                ["Unit Tag:", unit.tag]
+            ];
+            projectFields.forEach(([label, value], fieldIndex) => {
+                const fieldRow = row(8 + fieldIndex);
+                addCell(rows, fieldRow, 2, label, 2);
+                addMergedText(rows, merges, fieldRow, 3, 5, value, 4);
             });
-            addPair(rows, merges, row++, "Wet Bulb Temperature", unit.wetBulbTemperature, "Refrigerant", unit.refrigerant);
 
-            addMergedText(rows, merges, row++, 1, 8, "ACTUAL CAPACITY", 2);
-            addPair(rows, merges, row++, "Total Heat Rejection", unit.correctedHor, "Capacity Match", unit.capacityPercent, {
-                rightValue: 9
+            for (const [sectionRow, title] of [
+                [14, "DESIGN CONDITIONS"],
+                [21, "ACTUAL CAPACITY"],
+                [28, "EVAPORATIVE CONDENSER DESCRIPTION"]
+            ]) {
+                addMergedText(rows, merges, row(sectionRow), 1, 9, title, 7);
+            }
+
+            addEcField(row(16), "Total Heat Rejection Required", unit.requiredCapacity, "MBH");
+            addEcField(row(17), "Condensing Temperature", unit.condensingTemperature, "°F");
+            addEcField(row(18), "Wet Bulb Temperature", unit.wetBulbTemperature, "°F");
+            addEcField(row(19), "Refrigerant", unit.refrigerant);
+            addEcField(row(23), "Total Heat Rejection", unit.correctedHor, "MBH");
+            addEcField(row(24), "Number of Cells", "N/A");
+            addEcField(row(25), "Heat Rejection/cell", "N/A", "MBH");
+
+            const fanMotor = String(unit.fanMotor ?? "").match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
+            const fansPerCell = fanMotor ? Number(fanMotor[1]) : "N/A";
+            const fanHp = fanMotor ? Number(fanMotor[2]) : "N/A";
+            const fanHpPerCell = fanMotor ? fansPerCell * fanHp : "N/A";
+            const descriptionFields = [
+                [30, "Product", "IEC", "Number of Fans/cell", fansPerCell],
+                [31, "Model Number", unit.model, "Fan Motor HP/Fan", fanHp],
+                [32, "Number of Cells", "N/A", "Fan Motor HP/Cell", fanHpPerCell],
+                [33, "Number of Circuits/cell", "N/A", "Fan Motor HP Total", "N/A"],
+                [34, "Motor Voltage", unit.motorVoltage, "Pump HP/cell", "N/A"],
+                [35, "R717 Charge (lb)", unit.r717ChargeLb ?? "N/A", "Pump GPM/cell", "N/A"],
+                [36, "Air Flow Rate", unit.airFlowCfm ?? "N/A", "", ""],
+                [37, "Air Flow Rate/cell", "N/A", "", ""]
+            ];
+            descriptionFields.forEach(([baseRow, leftLabel, leftValue, rightLabel, rightValue]) => {
+                const currentRow = row(baseRow);
+                addMergedText(rows, merges, currentRow, 1, 2, leftLabel, 2);
+                addMergedText(rows, merges, currentRow, 3, 4, leftValue ?? "N/A", 3);
+                if (rightLabel) {
+                    addMergedText(rows, merges, currentRow, 7, 8, rightLabel, 2);
+                    addMergedText(rows, merges, currentRow, 9, 10, rightValue ?? "N/A", 3);
+                }
             });
-            addPair(rows, merges, row++, "Base HOR", unit.baseHor, "Fan Motor", unit.fanMotor);
 
-            addMergedText(rows, merges, row++, 1, 8, "EVAPORATIVE CONDENSER DESCRIPTION", 2);
-            addPair(rows, merges, row++, "Product", "IEC", "Model Number", unit.model);
-            addPair(rows, merges, row++, "Motor Voltage", unit.motorVoltage, "Air Flow Rate", unit.airFlowCfm ?? "N/A");
-            addPair(rows, merges, row++, "Internal Coil Volume", unit.internalCoilVolume ?? "N/A", "R717 Charge", unit.r717ChargeLb ?? "N/A");
-            if (index < units.length - 1) row++;
+            addMergedText(rows, merges, row(39), 1, 3, "Per Cell Dimension and Weight", 7);
+            addMergedText(rows, merges, row(39), 7, 9, "Total Dimension and Weight", 7);
+            addEcPair(row(40), "Shipping Weight(lbs)", "N/A", "Shipping Weight(lbs)", "N/A");
+            addEcPair(row(41), "Heaviest Sec Weight(lbs)", "N/A", "", "");
+            addEcPair(row(42), "Max Operating Weight(lbs)", "N/A", "Max Operating Weight(lbs)", "N/A");
+            addEcPair(row(43), "Width(ft)", "N/A", "Width(ft)", "N/A");
+            addEcPair(row(44), "Length(ft)", "N/A", "Length(ft)", "N/A");
+            addEcPair(row(45), "Height(ft)", "N/A", "", "");
+            if (index < units.length - 1) rowBreaks.push(row(47));
         });
-        return worksheetXml(rows, merges, [18, 12, 12, 12, 18, 12, 12, 12]);
+
+        return worksheetXml(rows, merges, [
+            11.29, 18, 10.86, 12.14, 7.71, 8.86, 11, 17.43, 13.71, 6.29, 13.14
+        ], { rowBreaks });
     }
 
     function stylesXml() {
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="2"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00;[Red](&quot;$&quot;#,##0.00)"/><numFmt numFmtId="165" formatCode="0.0&quot;%&quot;"/></numFmts>
-<fonts count="3">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00;[Red](&quot;$&quot;#,##0.00)"/></numFmts>
+<fonts count="4">
 <font><sz val="10"/><name val="Arial"/></font>
-<font><b/><color rgb="FFFFFFFF"/><sz val="14"/><name val="Arial"/></font>
-<font><b/><color rgb="FF004F9F"/><sz val="11"/><name val="Arial"/></font>
+<font><b/><sz val="16"/><name val="Arial"/></font>
+<font><b/><sz val="10"/><name val="Arial"/></font>
+<font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Arial"/></font>
 </fonts>
-<fills count="5">
+<fills count="6">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FF004F9F"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFDCEEFF"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFD6D6D6"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE3BC8D"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF004F9F"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFE9EDF1"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
-<borders count="2">
+<borders count="3">
 <border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left style="thin"><color rgb="FF8797A5"/></left><right style="thin"><color rgb="FF8797A5"/></right><top style="thin"><color rgb="FF8797A5"/></top><bottom style="thin"><color rgb="FF8797A5"/></bottom><diagonal/></border>
+<border><left/><right/><top/><bottom style="medium"><color rgb="FF53677A"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="10">
+<cellXfs count="13">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-<xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-<xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+<xf numFmtId="0" fontId="3" fillId="4" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="5" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="164" fontId="2" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
