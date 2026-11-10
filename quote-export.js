@@ -8,119 +8,151 @@
         return crc >>> 0;
     });
 
-    function xmlEscape(value) {
-        return String(value ?? "")
-            .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&apos;");
-    }
+    const spreadsheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    function columnName(index) {
-        let name = "";
-        while (index > 0) {
-            const remainder = (index - 1) % 26;
-            name = String.fromCharCode(65 + remainder) + name;
-            index = Math.floor((index - 1) / 26);
+    function parseWorksheet(xml) {
+        const document = new DOMParser().parseFromString(xml, "application/xml");
+        if (document.getElementsByTagName("parsererror").length) {
+            throw new Error("The quote template contains invalid worksheet XML.");
         }
-        return name;
+        return document;
     }
 
-    function addCell(rows, rowNumber, column, value, style = 0) {
-        if (!rows.has(rowNumber)) rows.set(rowNumber, new Map());
-        rows.get(rowNumber).set(column, { value, style });
+    function serializeWorksheet(document) {
+        return new XMLSerializer().serializeToString(document);
     }
 
-    function addMergedText(rows, merges, row, startColumn, endColumn, value, style = 0) {
-        addCell(rows, row, startColumn, value, style);
-        if (endColumn > startColumn) {
-            merges.push(`${columnName(startColumn)}${row}:${columnName(endColumn)}${row}`);
+    function getSheetData(sheet) {
+        const sheetData = sheet.getElementsByTagNameNS(spreadsheetNamespace, "sheetData")[0];
+        if (!sheetData) throw new Error("The quote template worksheet is missing its data section.");
+        return sheetData;
+    }
+
+    function getRow(sheetData, rowNumber) {
+        return Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))
+            .find(row => Number(row.getAttribute("r")) === rowNumber);
+    }
+
+    function insertRow(sheetData, row) {
+        const rowNumber = Number(row.getAttribute("r"));
+        const nextRow = Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))
+            .find(existing => Number(existing.getAttribute("r")) > rowNumber);
+        sheetData.insertBefore(row, nextRow ?? null);
+    }
+
+    function findCell(row, reference) {
+        return Array.from(row.getElementsByTagNameNS(spreadsheetNamespace, "c"))
+            .find(cell => cell.getAttribute("r") === reference);
+    }
+
+    function writeCell(cell, value) {
+        while (cell.firstChild) cell.removeChild(cell.firstChild);
+        if (typeof value === "number" && Number.isFinite(value)) {
+            cell.removeAttribute("t");
+            const numericValue = cell.ownerDocument.createElementNS(spreadsheetNamespace, "v");
+            numericValue.textContent = String(value);
+            cell.appendChild(numericValue);
+            return;
+        }
+
+        cell.setAttribute("t", "inlineStr");
+        const inlineString = cell.ownerDocument.createElementNS(spreadsheetNamespace, "is");
+        const text = cell.ownerDocument.createElementNS(spreadsheetNamespace, "t");
+        text.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+        text.textContent = String(value ?? "");
+        inlineString.appendChild(text);
+        cell.appendChild(inlineString);
+    }
+
+    function setCellValue(sheetData, rowNumber, reference, value) {
+        const row = getRow(sheetData, rowNumber);
+        const cell = row && findCell(row, reference);
+        if (!cell) throw new Error(`The quote template is missing cell ${reference}.`);
+        writeCell(cell, value);
+    }
+
+    function shiftReference(reference, startRow, offset) {
+        return reference.replace(/(\$?[A-Z]+\$?)(\d+)/g, (match, column, row) =>
+            Number(row) >= startRow ? `${column}${Number(row) + offset}` : match
+        );
+    }
+
+    function shiftRows(sheet, startRow, offset) {
+        if (!offset) return;
+        const sheetData = getSheetData(sheet);
+        for (const row of sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row")) {
+            const rowNumber = Number(row.getAttribute("r"));
+            if (rowNumber < startRow) continue;
+            row.setAttribute("r", String(rowNumber + offset));
+            for (const cell of row.getElementsByTagNameNS(spreadsheetNamespace, "c")) {
+                cell.setAttribute("r", shiftReference(cell.getAttribute("r"), startRow, offset));
+            }
+        }
+
+        const merges = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell");
+        for (const merge of merges) {
+            const reference = merge.getAttribute("ref");
+            const firstRow = Number(reference.match(/\d+/)?.[0]);
+            if (firstRow >= startRow) {
+                merge.setAttribute("ref", shiftReference(reference, startRow, offset));
+            }
         }
     }
 
-    function worksheetXml(rows, merges, widths, pageSetup = {}) {
-        const rowXml = [...rows.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([rowNumber, cells]) => {
-                const cellXml = [...cells.entries()]
-                    .sort(([a], [b]) => a - b)
-                    .map(([column, cell]) => {
-                        const reference = `${columnName(column)}${rowNumber}`;
-                        const style = ` s="${cell.style}"`;
-                        if (typeof cell.value === "number" && Number.isFinite(cell.value)) {
-                            return `<c r="${reference}"${style}><v>${cell.value}</v></c>`;
-                        }
-                        return `<c r="${reference}" t="inlineStr"${style}><is><t xml:space="preserve">${xmlEscape(cell.value)}</t></is></c>`;
-                    })
-                    .join("");
-                return `<row r="${rowNumber}">${cellXml}</row>`;
-            })
-            .join("");
-        const cols = widths.map((width, index) =>
-            `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`
-        ).join("");
-        const mergeXml = merges.length
-            ? `<mergeCells count="${merges.length}">${merges.map(ref => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>`
-            : "";
-        const rowBreaks = pageSetup.rowBreaks?.length
-            ? `<rowBreaks count="${pageSetup.rowBreaks.length}" manualBreakCount="${pageSetup.rowBreaks.length}">${pageSetup.rowBreaks.map(id => `<brk id="${id}" max="16383" man="1"/>`).join("")}</rowBreaks>`
-            : "";
-        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
-<sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>
-<sheetFormatPr defaultRowHeight="15"/>
-<cols>${cols}</cols>
-<sheetData>${rowXml}</sheetData>
-${mergeXml}
-<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
-<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>
-${rowBreaks}
-</worksheet>`;
+    function addQuoteLine(sheet, rowNumber, line) {
+        const sheetData = getSheetData(sheet);
+        let row = getRow(sheetData, rowNumber);
+        if (!row) {
+            const templateRow = getRow(sheetData, 15);
+            if (!templateRow) throw new Error("The quote template is missing its formatted line-item row.");
+            row = templateRow.cloneNode(true);
+            const oldRowNumber = Number(row.getAttribute("r"));
+            const rowOffset = rowNumber - oldRowNumber;
+            row.setAttribute("r", String(rowNumber));
+            for (const cell of row.getElementsByTagNameNS(spreadsheetNamespace, "c")) {
+                cell.setAttribute("r", shiftReference(cell.getAttribute("r"), oldRowNumber, rowOffset));
+            }
+            insertRow(sheetData, row);
+
+            const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
+            for (const original of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
+                const reference = original.getAttribute("ref");
+                if (Number(reference.match(/\d+/)?.[0]) !== oldRowNumber) continue;
+                const merge = original.cloneNode(true);
+                merge.setAttribute("ref", shiftReference(reference, oldRowNumber, rowOffset));
+                mergeCells.appendChild(merge);
+            }
+            mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
+        }
+
+        for (const [column, value] of [
+            ["A", line.quantity], ["B", line.description],
+            ["I", line.netEach], ["K", line.extended]
+        ]) {
+            setCellValue(sheetData, rowNumber, `${column}${rowNumber}`, value);
+        }
     }
 
-    function makeQuoteSheet(project, units, costMultiplier, exportDate) {
-        const rows = new Map();
-        const merges = [];
-        addCell(rows, 1, 4, "SPX Cooling Tech, LLC", 1);
-        addCell(rows, 2, 4, "827 West Progress Drive", 0);
-        addCell(rows, 3, 4, "Dixon, IL 61021", 0);
-        addCell(rows, 4, 4, "Phone (815) 284-2700   Fax (815) 288-0807", 0);
-        addCell(rows, 7, 2, "Customer:", 3);
-        addMergedText(rows, merges, 7, 3, 6, project.customer, 4);
-        addCell(rows, 7, 8, "Contact:", 3);
-        addMergedText(rows, merges, 7, 9, 12, project.contact, 4);
-        addCell(rows, 8, 2, "Project Name:", 3);
-        addMergedText(rows, merges, 8, 3, 6, project.projectName, 4);
-        addCell(rows, 8, 8, "Prepared by:", 3);
-        addMergedText(rows, merges, 8, 9, 12, project.preparedBy, 4);
-        addCell(rows, 9, 2, "Quote #:", 3);
-        addMergedText(rows, merges, 9, 3, 6, project.quoteNumber, 4);
-        addCell(rows, 9, 8, "Date:", 3);
-        addMergedText(rows, merges, 9, 9, 12, exportDate, 4);
-        addCell(rows, 11, 1, "QTY", 5);
-        addMergedText(rows, merges, 11, 2, 8, "PART DESCRIPTION / NOTES", 5);
-        addMergedText(rows, merges, 11, 9, 10, "NET EACH $", 5);
-        addMergedText(rows, merges, 11, 11, 12, "EXTENDED $", 5);
+    function makeQuoteSheet(templateXml, project, units, exportDate) {
+        const sheet = parseWorksheet(templateXml);
+        const sheetData = getSheetData(sheet);
+        const projectCells = [
+            [7, "C7", project.customer], [7, "I7", project.contact],
+            [8, "C8", project.projectName], [8, "I8", project.preparedBy],
+            [9, "C9", project.quoteNumber], [9, "I9", exportDate]
+        ];
+        for (const [row, cell, value] of projectCells) setCellValue(sheetData, row, cell, value);
 
-        let row = 13;
-        let total = 0;
+        const lines = [];
         for (const unit of units) {
             const basePrice = Number(unit.baseNetPrice) || 0;
-            const baseDescription = [
+            const description = [
                 `Evaporative Condenser - ${unit.model}`,
                 unit.location ? `Location: ${unit.location}` : "",
                 unit.tag ? `Unit Tag: ${unit.tag}` : "",
                 `${Number(unit.requiredCapacity).toLocaleString()} MBH - ${unit.refrigerant}`
             ].filter(Boolean).join(" | ");
-            addCell(rows, row, 1, 1, 8);
-            addMergedText(rows, merges, row, 2, 8, baseDescription, 10);
-            addMergedText(rows, merges, row, 9, 10, basePrice, 9);
-            addMergedText(rows, merges, row, 11, 12, basePrice, 9);
-            total += basePrice;
-            row++;
+            lines.push({ quantity: 1, description, netEach: basePrice, extended: basePrice });
 
             for (const option of (unit.options ?? []).filter(item => item.optionId)) {
                 const name = option.optionId === "hdg-internal-service-platform"
@@ -128,122 +160,106 @@ ${rowBreaks}
                     : option.optionId;
                 const quantity = Number(option.quantity) || 1;
                 const netEach = Number(option.netEachPrice) || 0;
-                const extended = quantity * netEach;
-                addCell(rows, row, 1, quantity, 8);
-                addMergedText(rows, merges, row, 2, 8, name, 10);
-                addMergedText(rows, merges, row, 9, 10, netEach, 9);
-                addMergedText(rows, merges, row, 11, 12, extended, 9);
-                total += extended;
-                row++;
+                lines.push({ quantity, description: name, netEach, extended: quantity * netEach });
             }
         }
 
-        const totalRow = Math.max(63, row + 1);
-        addCell(rows, totalRow, 1, "Estimated Lead Time:", 3);
-        addCell(rows, totalRow, 4, "Select", 4);
-        addMergedText(rows, merges, totalRow, 9, 10, "Total:", 11);
-        addMergedText(rows, merges, totalRow, 11, 12, total, 12);
-        addMergedText(rows, merges, totalRow + 1, 1, 12, "Quoted price is good for 30 days from today's date; freight and taxes not included.", 0);
-        addMergedText(rows, merges, totalRow + 2, 1, 12, "Evaporative Condenser Product: All Prices FOB Dixon, IL.", 0);
-        addMergedText(rows, merges, totalRow + 3, 1, 12, "Unit specifications are listed on the Item EC tab.", 0);
-        addMergedText(rows, merges, totalRow + 4, 1, 12, "Pricing reflects the current $1.00 unit and $0.00 option list-price placeholders.", 0);
-        return worksheetXml(rows, merges, Array(12).fill(9.71));
+        const totalRow = Math.max(63, 14 + lines.length);
+        shiftRows(sheet, 63, totalRow - 63);
+        for (let index = 0; index < Math.max(3, lines.length); index++) {
+            const rowNumber = 13 + index;
+            addQuoteLine(sheet, rowNumber, lines[index] ?? {
+                quantity: "", description: "", netEach: "", extended: ""
+            });
+        }
+
+        let total = 0;
+        for (const line of lines) total += line.extended;
+        const finalSheetData = getSheetData(sheet);
+        setCellValue(finalSheetData, totalRow, `K${totalRow}`, total);
+        return serializeWorksheet(sheet);
     }
 
-    function makeItemEcSheet(project, units, exportDate) {
-        const rows = new Map();
-        const merges = [];
-        const rowBreaks = [];
-        const addEcField = (row, label, value, unit = "") => {
-            addMergedText(rows, merges, row, 1, 3, label, 2);
-            addCell(rows, row, 4, value ?? "N/A", 3);
-            if (unit) addCell(rows, row, 5, unit, 2);
-        };
-        const addEcPair = (row, leftLabel, leftValue, rightLabel, rightValue) => {
-            addMergedText(rows, merges, row, 1, 2, leftLabel, 2);
-            addMergedText(rows, merges, row, 3, 4, leftValue ?? "N/A", 3);
-            if (rightLabel) {
-                addMergedText(rows, merges, row, 7, 8, rightLabel, 2);
-                addMergedText(rows, merges, row, 9, 10, rightValue ?? "N/A", 3);
+    function cloneItemPage(sheet, offset) {
+        const sheetData = getSheetData(sheet);
+        const pageRows = Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))
+            .filter(row => Number(row.getAttribute("r")) <= 45)
+            .map(row => row.cloneNode(true));
+        for (const row of pageRows) {
+            const oldRowNumber = Number(row.getAttribute("r"));
+            row.setAttribute("r", String(oldRowNumber + offset));
+            for (const cell of row.getElementsByTagNameNS(spreadsheetNamespace, "c")) {
+                cell.setAttribute("r", shiftReference(cell.getAttribute("r"), 1, offset));
             }
-        };
+            insertRow(sheetData, row);
+        }
 
+        const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
+        for (const original of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
+            const reference = original.getAttribute("ref");
+            if (Number(reference.match(/\d+/)?.[0]) > 45) continue;
+            const merge = original.cloneNode(true);
+            merge.setAttribute("ref", shiftReference(reference, 1, offset));
+            mergeCells.appendChild(merge);
+        }
+        mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
+
+        let rowBreaks = sheet.getElementsByTagNameNS(spreadsheetNamespace, "rowBreaks")[0];
+        if (!rowBreaks) {
+            rowBreaks = sheet.createElementNS(spreadsheetNamespace, "rowBreaks");
+            const pageSetup = sheet.getElementsByTagNameNS(spreadsheetNamespace, "pageSetup")[0];
+            const worksheet = sheet.documentElement;
+            if (pageSetup?.nextSibling) worksheet.insertBefore(rowBreaks, pageSetup.nextSibling);
+            else worksheet.appendChild(rowBreaks);
+        }
+        const breakNode = sheet.createElementNS(spreadsheetNamespace, "brk");
+        breakNode.setAttribute("id", String(offset - 1));
+        breakNode.setAttribute("max", "16383");
+        breakNode.setAttribute("man", "1");
+        rowBreaks.appendChild(breakNode);
+        rowBreaks.setAttribute("count", String(rowBreaks.getElementsByTagNameNS(spreadsheetNamespace, "brk").length));
+        rowBreaks.setAttribute("manualBreakCount", rowBreaks.getAttribute("count"));
+    }
+
+    function populateItemPage(sheet, project, unit, offset) {
+        const sheetData = getSheetData(sheet);
+        const set = (row, cell, value) => setCellValue(sheetData, row + offset, `${cell}${row + offset}`, value);
+        set(8, "C", project.customer);
+        set(9, "C", project.projectName);
+        set(10, "C", project.quoteNumber);
+        set(11, "C", unit.location);
+        set(12, "C", unit.tag);
+        set(16, "D", unit.requiredCapacity);
+        set(17, "D", unit.condensingTemperature);
+        set(18, "D", unit.wetBulbTemperature);
+        set(19, "D", unit.refrigerant);
+        set(23, "D", unit.correctedHor);
+        set(24, "D", "N/A");
+        set(25, "D", "N/A");
+
+        const fanMotor = String(unit.fanMotor ?? "").match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
+        const fansPerCell = fanMotor ? Number(fanMotor[1]) : "N/A";
+        const fanHp = fanMotor ? Number(fanMotor[2]) : "N/A";
+        const descriptionValues = [
+            [30, "C", "IEC"], [30, "I", fansPerCell],
+            [31, "C", unit.model], [31, "I", fanHp],
+            [32, "C", "N/A"], [32, "I", fanMotor ? fansPerCell * fanHp : "N/A"],
+            [33, "C", "N/A"], [33, "I", "N/A"],
+            [34, "C", unit.motorVoltage], [34, "I", "N/A"],
+            [35, "C", unit.r717ChargeLb ?? "N/A"], [35, "I", "N/A"],
+            [36, "C", unit.airFlowCfm ?? "N/A"], [37, "C", "N/A"]
+        ];
+        for (const [row, column, value] of descriptionValues) set(row, column, value);
+    }
+
+    function makeItemEcSheet(templateXml, project, units) {
+        const sheet = parseWorksheet(templateXml);
         units.forEach((unit, index) => {
             const offset = index * 48;
-            const row = base => base + offset;
-            addCell(rows, row(1), 4, "SPX Cooling Tech, LLC", 1);
-            addCell(rows, row(2), 4, "827 West Progress Drive", 0);
-            addCell(rows, row(3), 4, "Dixon, IL 61021", 0);
-            addCell(rows, row(4), 4, "Phone (815) 284-2700   Fax (815) 288-0808", 0);
-            addCell(rows, row(6), 1, "Evaporative Condenser Specification Sheet", 6);
-
-            const projectFields = [
-                ["Customer:", project.customer],
-                ["Project Name:", project.projectName],
-                ["Quote #:", project.quoteNumber],
-                ["Unit Location:", unit.location],
-                ["Unit Tag:", unit.tag]
-            ];
-            projectFields.forEach(([label, value], fieldIndex) => {
-                const fieldRow = row(8 + fieldIndex);
-                addCell(rows, fieldRow, 2, label, 2);
-                addMergedText(rows, merges, fieldRow, 3, 5, value, 4);
-            });
-
-            for (const [sectionRow, title] of [
-                [14, "DESIGN CONDITIONS"],
-                [21, "ACTUAL CAPACITY"],
-                [28, "EVAPORATIVE CONDENSER DESCRIPTION"]
-            ]) {
-                addMergedText(rows, merges, row(sectionRow), 1, 9, title, 7);
-            }
-
-            addEcField(row(16), "Total Heat Rejection Required", unit.requiredCapacity, "MBH");
-            addEcField(row(17), "Condensing Temperature", unit.condensingTemperature, "°F");
-            addEcField(row(18), "Wet Bulb Temperature", unit.wetBulbTemperature, "°F");
-            addEcField(row(19), "Refrigerant", unit.refrigerant);
-            addEcField(row(23), "Total Heat Rejection", unit.correctedHor, "MBH");
-            addEcField(row(24), "Number of Cells", "N/A");
-            addEcField(row(25), "Heat Rejection/cell", "N/A", "MBH");
-
-            const fanMotor = String(unit.fanMotor ?? "").match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
-            const fansPerCell = fanMotor ? Number(fanMotor[1]) : "N/A";
-            const fanHp = fanMotor ? Number(fanMotor[2]) : "N/A";
-            const fanHpPerCell = fanMotor ? fansPerCell * fanHp : "N/A";
-            const descriptionFields = [
-                [30, "Product", "IEC", "Number of Fans/cell", fansPerCell],
-                [31, "Model Number", unit.model, "Fan Motor HP/Fan", fanHp],
-                [32, "Number of Cells", "N/A", "Fan Motor HP/Cell", fanHpPerCell],
-                [33, "Number of Circuits/cell", "N/A", "Fan Motor HP Total", "N/A"],
-                [34, "Motor Voltage", unit.motorVoltage, "Pump HP/cell", "N/A"],
-                [35, "R717 Charge (lb)", unit.r717ChargeLb ?? "N/A", "Pump GPM/cell", "N/A"],
-                [36, "Air Flow Rate", unit.airFlowCfm ?? "N/A", "", ""],
-                [37, "Air Flow Rate/cell", "N/A", "", ""]
-            ];
-            descriptionFields.forEach(([baseRow, leftLabel, leftValue, rightLabel, rightValue]) => {
-                const currentRow = row(baseRow);
-                addMergedText(rows, merges, currentRow, 1, 2, leftLabel, 2);
-                addMergedText(rows, merges, currentRow, 3, 4, leftValue ?? "N/A", 3);
-                if (rightLabel) {
-                    addMergedText(rows, merges, currentRow, 7, 8, rightLabel, 2);
-                    addMergedText(rows, merges, currentRow, 9, 10, rightValue ?? "N/A", 3);
-                }
-            });
-
-            addMergedText(rows, merges, row(39), 1, 3, "Per Cell Dimension and Weight", 7);
-            addMergedText(rows, merges, row(39), 7, 9, "Total Dimension and Weight", 7);
-            addEcPair(row(40), "Shipping Weight(lbs)", "N/A", "Shipping Weight(lbs)", "N/A");
-            addEcPair(row(41), "Heaviest Sec Weight(lbs)", "N/A", "", "");
-            addEcPair(row(42), "Max Operating Weight(lbs)", "N/A", "Max Operating Weight(lbs)", "N/A");
-            addEcPair(row(43), "Width(ft)", "N/A", "Width(ft)", "N/A");
-            addEcPair(row(44), "Length(ft)", "N/A", "Length(ft)", "N/A");
-            addEcPair(row(45), "Height(ft)", "N/A", "", "");
-            if (index < units.length - 1) rowBreaks.push(row(47));
+            if (offset) cloneItemPage(sheet, offset);
+            populateItemPage(sheet, project, unit, offset);
         });
-
-        return worksheetXml(rows, merges, [
-            11.29, 18, 10.86, 12.14, 7.71, 8.86, 11, 17.43, 13.71, 6.29, 13.14
-        ], { rowBreaks });
+        return serializeWorksheet(sheet);
     }
 
     function crc32(bytes) {
@@ -318,6 +334,23 @@ ${rowBreaks}
         return entries;
     }
 
+    async function readZipEntryText(entry) {
+        let bytes = entry.compressed;
+        if (entry.method === 8) {
+            if (typeof DecompressionStream !== "function") {
+                throw new Error("This browser cannot read the compressed quote template.");
+            }
+            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+            bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+        } else if (entry.method !== 0) {
+            throw new Error(`The quote template uses unsupported compression method ${entry.method}.`);
+        }
+        if (bytes.length !== entry.uncompressedSize || crc32(bytes) !== entry.crc) {
+            throw new Error(`The quote template entry ${entry.name} is incomplete or corrupted.`);
+        }
+        return new TextDecoder().decode(bytes);
+    }
+
     function zipFiles(files) {
         const localParts = [];
         const centralParts = [];
@@ -382,7 +415,7 @@ ${rowBreaks}
         });
     }
 
-    async function exportQuoteWorkbook({ project, units, costMultiplier }) {
+    async function exportQuoteWorkbook({ project, units }) {
         if (!Array.isArray(units) || units.length === 0) {
             throw new Error("Add at least one unit before exporting the quote.");
         }
@@ -399,8 +432,8 @@ ${rowBreaks}
             throw new Error("The quote template is missing a required worksheet.");
         }
         for (const [file, content] of [
-            [quoteSheet, makeQuoteSheet(project, units, costMultiplier, exportDate)],
-            [itemSheet, makeItemEcSheet(project, units, exportDate)]
+            [quoteSheet, makeQuoteSheet(await readZipEntryText(quoteSheet), project, units, exportDate)],
+            [itemSheet, makeItemEcSheet(await readZipEntryText(itemSheet), project, units)]
         ]) {
             const bytes = encoder.encode(content);
             file.method = 0;
