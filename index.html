@@ -1299,6 +1299,9 @@ for (const row of unitRows) {
     });
 
     for (const field of row.querySelectorAll("[data-unit-field]")) {
+        field.addEventListener("focus", () => {
+            renderUnitDetails(unitNumber);
+        });
         field.addEventListener("input", () => {
             saveProjectData();
             if (Number(activeUnitNumber) === Number(unitNumber)) renderUnitDetails(unitNumber);
