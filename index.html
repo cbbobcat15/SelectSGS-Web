@@ -315,6 +315,42 @@
             margin: 0 0 12px;
         }
 
+        .quote-template-controls {
+            margin-bottom: 16px;
+            padding: 12px;
+            border: 1px solid #c4cbd2;
+            border-radius: 4px;
+            background: #f7f9fb;
+        }
+
+        .quote-template-controls label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        .quote-template-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quote-template-actions input {
+            flex: 1 1 260px;
+            width: auto;
+        }
+
+        .quote-template-actions button {
+            margin: 0;
+            padding: 10px 14px;
+        }
+
+        .quote-template-status {
+            margin: 8px 0 0;
+            font-size: .9rem;
+        }
+
         .unit-table-wrapper {
             overflow-x: auto;
         }
@@ -750,6 +786,14 @@
                 <h2 id="unit-list-heading">Item Summary</h2>
                 <button id="export-quote" type="button" disabled>Export Quote</button>
             </div>
+            <section class="quote-template-controls" aria-labelledby="quote-template-heading">
+                <label id="quote-template-heading" for="quote-template-file">Excel quote template (.xlsx)</label>
+                <div class="quote-template-actions">
+                    <input id="quote-template-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled>
+                    <button id="reset-quote-template" type="button" disabled>Use standard template</button>
+                </div>
+                <p id="quote-template-status" class="quote-template-status" role="status">Loading saved template…</p>
+            </section>
             <div class="unit-table-wrapper">
                 <table>
                     <thead>
@@ -792,7 +836,7 @@
     </div>
 </main>
 </div>
-<script src="quote-export.js?v=20261110-1924"></script>
+<script src="quote-export.js?v=20261110-2015"></script>
 <script>
 const projectForm = document.getElementById("project-form");
 const projectFields = [...projectForm.elements].filter(element => element.name);
@@ -811,6 +855,9 @@ const deleteProjectButton = document.getElementById("delete-project");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 const exportQuoteButton = document.getElementById("export-quote");
+const quoteTemplateFileInput = document.getElementById("quote-template-file");
+const resetQuoteTemplateButton = document.getElementById("reset-quote-template");
+const quoteTemplateStatus = document.getElementById("quote-template-status");
 const optionsPanel = document.getElementById("options-panel");
 const multiplierInput = document.getElementById("cost-multiplier");
 const optionRows = document.getElementById("option-rows");
@@ -827,6 +874,62 @@ let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNum
 let costMultiplier = 0.35;
 let activeProjectId = null;
 let projectTreeProjects = [];
+let activeQuoteTemplateName = null;
+
+function showQuoteTemplateStatus(template) {
+    activeQuoteTemplateName = template?.name ?? null;
+    quoteTemplateStatus.textContent = activeQuoteTemplateName
+        ? `Using saved template: ${activeQuoteTemplateName}`
+        : "Using the standard quote-template.xlsx.";
+    quoteTemplateFileInput.disabled = false;
+    resetQuoteTemplateButton.disabled = !activeQuoteTemplateName;
+}
+
+quoteTemplateFileInput.addEventListener("change", async () => {
+    const file = quoteTemplateFileInput.files[0];
+    if (!file) return;
+
+    quoteTemplateFileInput.disabled = true;
+    resetQuoteTemplateButton.disabled = true;
+    quoteTemplateStatus.textContent = `Validating and saving ${file.name}…`;
+    try {
+        const template = await window.saveQuoteTemplate(file);
+        showQuoteTemplateStatus(template);
+        formError.hidden = true;
+    } catch (error) {
+        quoteTemplateStatus.textContent = `Template upload failed; the previous template is unchanged. ${error.message}`;
+        formError.textContent = `The Excel template could not be saved: ${error.message}`;
+        formError.hidden = false;
+        console.error("Could not save custom quote template.", error);
+    } finally {
+        quoteTemplateFileInput.value = "";
+        quoteTemplateFileInput.disabled = false;
+        resetQuoteTemplateButton.disabled = !activeQuoteTemplateName;
+    }
+});
+
+resetQuoteTemplateButton.addEventListener("click", async () => {
+    try {
+        await window.resetQuoteTemplate();
+        showQuoteTemplateStatus(null);
+        formError.hidden = true;
+    } catch (error) {
+        formError.textContent = `The saved Excel template could not be removed: ${error.message}`;
+        formError.hidden = false;
+        console.error("Could not reset custom quote template.", error);
+    }
+});
+
+window.loadSavedQuoteTemplate()
+    .then(showQuoteTemplateStatus)
+    .catch(error => {
+        quoteTemplateFileInput.disabled = false;
+        resetQuoteTemplateButton.disabled = false;
+        quoteTemplateStatus.textContent = "The saved Excel template could not be loaded. Upload it again or switch to the standard template.";
+        formError.textContent = `The saved Excel template could not be loaded: ${error.message}`;
+        formError.hidden = false;
+        console.error("Could not restore saved quote template.", error);
+    });
 
 function formatCurrency(value) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(value);
