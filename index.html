@@ -303,6 +303,18 @@
             color: #004f9f;
         }
 
+        .unit-list-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .unit-list-heading button {
+            margin: 0 0 12px;
+        }
+
         .unit-table-wrapper {
             overflow-x: auto;
         }
@@ -734,7 +746,10 @@
         </aside>
 
         <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
-            <h2 id="unit-list-heading">Item Summary</h2>
+            <div class="unit-list-heading">
+                <h2 id="unit-list-heading">Item Summary</h2>
+                <button id="export-quote" type="button" disabled>Export Excel Quote</button>
+            </div>
             <div class="unit-table-wrapper">
                 <table>
                     <thead>
@@ -777,6 +792,7 @@
     </div>
 </main>
 </div>
+<script src="quote-export.js"></script>
 <script>
 const projectForm = document.getElementById("project-form");
 const projectFields = [...projectForm.elements].filter(element => element.name);
@@ -794,6 +810,7 @@ const archiveProjectButton = document.getElementById("archive-project");
 const deleteProjectButton = document.getElementById("delete-project");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
+const exportQuoteButton = document.getElementById("export-quote");
 const optionsPanel = document.getElementById("options-panel");
 const multiplierInput = document.getElementById("cost-multiplier");
 const optionRows = document.getElementById("option-rows");
@@ -881,6 +898,12 @@ function renderUnitDetails(unitNumber) {
     updateQuotePrices();
 }
 
+function getUnitLinePrice(unit) {
+    const optionNet = getUnitOptions(unit).reduce((sum, option) =>
+        sum + (option.optionId ? option.quantity * accessoryListPrice * costMultiplier : 0), 0);
+    return (Number(unit.price) || 0) * costMultiplier + optionNet;
+}
+
 function getUnitOptions(unit) {
     if (!Array.isArray(unit.options)) {
         unit.options = Array.from({ length: optionLineCount }, (_, index) => ({
@@ -942,15 +965,12 @@ function updateQuotePrices() {
         const unit = quotedUnits[unitNumber];
         if (!unit) continue;
 
-        const unitListPrice = Number(unit.price) || 0;
-        const options = getUnitOptions(unit);
-        const optionNet = options.reduce((sum, option) =>
-            sum + (option.optionId ? option.quantity * accessoryListPrice * costMultiplier : 0), 0);
-        const linePrice = unitListPrice * costMultiplier + optionNet;
+        const linePrice = getUnitLinePrice(unit);
         row.querySelector("[data-unit-price]").textContent = formatCurrency(linePrice);
         total += linePrice;
     }
 
+    exportQuoteButton.disabled = !unitRows.some(row => quotedUnits[row.dataset.unitRow]);
     document.getElementById("quote-total").textContent = `Total Cost: ${formatCurrency(total)}`;
     const activeUnit = Number.isInteger(activeUnitNumber) ? quotedUnits[activeUnitNumber] : null;
     if (!activeUnit) return;
@@ -965,6 +985,33 @@ function updateQuotePrices() {
         );
     }
 }
+
+exportQuoteButton.addEventListener("click", () => {
+    try {
+        const units = unitRows.flatMap(row => {
+            const unit = quotedUnits[row.dataset.unitRow];
+            if (!unit) return [];
+            return [{
+                ...unit,
+                unitNumber: Number(row.dataset.unitRow),
+                location: row.querySelector('[data-unit-field="location"]').value,
+                tag: row.querySelector('[data-unit-field="tag"]').value,
+                netPrice: getUnitLinePrice(unit)
+            }];
+        });
+        window.exportQuoteWorkbook({
+            project: getProjectData(),
+            units,
+            costMultiplier
+        });
+        projectTreeStatus.textContent = "Excel quote exported.";
+        formError.hidden = true;
+    } catch (error) {
+        formError.textContent = "The Excel quote could not be exported. Try again or check your browser's download settings.";
+        formError.hidden = false;
+        console.error("Could not export Excel quote.", error);
+    }
+});
 
 function validateCostMultiplier() {
     const multiplier = Number(multiplierInput.value);
