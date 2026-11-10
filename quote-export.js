@@ -246,49 +246,6 @@ ${rowBreaks}
         ], { rowBreaks });
     }
 
-    function stylesXml() {
-        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00;[Red](&quot;$&quot;#,##0.00)"/></numFmts>
-<fonts count="4">
-<font><sz val="10"/><name val="Arial"/></font>
-<font><b/><sz val="16"/><name val="Arial"/></font>
-<font><b/><sz val="10"/><name val="Arial"/></font>
-<font><b/><color rgb="FFFFFFFF"/><sz val="10"/><name val="Arial"/></font>
-</fonts>
-<fills count="6">
-<fill><patternFill patternType="none"/></fill>
-<fill><patternFill patternType="gray125"/></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFD6D6D6"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFE3BC8D"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FF004F9F"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFE9EDF1"/><bgColor indexed="64"/></patternFill></fill>
-</fills>
-<borders count="3">
-<border><left/><right/><top/><bottom/><diagonal/></border>
-<border><left style="thin"><color rgb="FF8797A5"/></left><right style="thin"><color rgb="FF8797A5"/></right><top style="thin"><color rgb="FF8797A5"/></top><bottom style="thin"><color rgb="FF8797A5"/></bottom><diagonal/></border>
-<border><left/><right/><top/><bottom style="medium"><color rgb="FF53677A"/></bottom><diagonal/></border>
-</borders>
-<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="13">
-<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-<xf numFmtId="0" fontId="3" fillId="4" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-<xf numFmtId="0" fontId="2" fillId="5" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf>
-<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-<xf numFmtId="164" fontId="2" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-</cellXfs>
-<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
-</styleSheet>`;
-    }
-
     function crc32(bytes) {
         let crc = 0xffffffff;
         for (const byte of bytes) {
@@ -305,56 +262,108 @@ ${rowBreaks}
         view.setUint32(offset, value >>> 0, true);
     }
 
+    function readZipEntries(buffer) {
+        const bytes = new Uint8Array(buffer);
+        const view = new DataView(buffer);
+        const minimumEocdOffset = Math.max(0, bytes.length - 65557);
+        let eocdOffset = -1;
+        for (let offset = bytes.length - 22; offset >= minimumEocdOffset; offset--) {
+            if (view.getUint32(offset, true) === 0x06054b50) {
+                eocdOffset = offset;
+                break;
+            }
+        }
+        if (eocdOffset < 0) throw new Error("The quote template is not a valid Excel workbook.");
+        if (view.getUint16(eocdOffset + 4, true) !== 0 ||
+            view.getUint16(eocdOffset + 6, true) !== 0) {
+            throw new Error("Multi-disk Excel workbooks are not supported.");
+        }
+
+        const entryCount = view.getUint16(eocdOffset + 10, true);
+        let offset = view.getUint32(eocdOffset + 16, true);
+        const decoder = new TextDecoder();
+        const entries = [];
+        for (let index = 0; index < entryCount; index++) {
+            if (view.getUint32(offset, true) !== 0x02014b50) {
+                throw new Error("The quote template contains an invalid file entry.");
+            }
+            const flags = view.getUint16(offset + 8, true);
+            const method = view.getUint16(offset + 10, true);
+            const crc = view.getUint32(offset + 16, true);
+            const compressedSize = view.getUint32(offset + 20, true);
+            const uncompressedSize = view.getUint32(offset + 24, true);
+            const filenameLength = view.getUint16(offset + 28, true);
+            const extraLength = view.getUint16(offset + 30, true);
+            const commentLength = view.getUint16(offset + 32, true);
+            const localOffset = view.getUint32(offset + 42, true);
+            const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + filenameLength));
+            if (flags & 1) throw new Error("Encrypted quote templates are not supported.");
+
+            const localFilenameLength = view.getUint16(localOffset + 26, true);
+            const localExtraLength = view.getUint16(localOffset + 28, true);
+            const dataOffset = localOffset + 30 + localFilenameLength + localExtraLength;
+            entries.push({
+                name,
+                method,
+                flags,
+                modTime: view.getUint16(offset + 12, true),
+                modDate: view.getUint16(offset + 14, true),
+                crc,
+                compressed: bytes.slice(dataOffset, dataOffset + compressedSize),
+                uncompressedSize,
+                externalAttributes: view.getUint32(offset + 38, true)
+            });
+            offset += 46 + filenameLength + extraLength + commentLength;
+        }
+        return entries;
+    }
+
     function zipFiles(files) {
         const localParts = [];
         const centralParts = [];
         let localOffset = 0;
-        const date = new Date();
-        const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
-        const dosDate = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
-
-        for (const [name, content] of files) {
-            const filename = encoder.encode(name);
-            const bytes = encoder.encode(content);
-            const checksum = crc32(bytes);
+        for (const file of files) {
+            const filename = encoder.encode(file.name);
+            const compressed = file.compressed;
+            const flags = 0x0800;
             const localHeader = new Uint8Array(30 + filename.length);
             const localView = new DataView(localHeader.buffer);
             write32(localView, 0, 0x04034b50);
             write16(localView, 4, 20);
-            write16(localView, 6, 0x0800);
-            write16(localView, 8, 0);
-            write16(localView, 10, dosTime);
-            write16(localView, 12, dosDate);
-            write32(localView, 14, checksum);
-            write32(localView, 18, bytes.length);
-            write32(localView, 22, bytes.length);
+            write16(localView, 6, flags);
+            write16(localView, 8, file.method);
+            write16(localView, 10, file.modTime);
+            write16(localView, 12, file.modDate);
+            write32(localView, 14, file.crc);
+            write32(localView, 18, compressed.length);
+            write32(localView, 22, file.uncompressedSize);
             write16(localView, 26, filename.length);
             write16(localView, 28, 0);
             localHeader.set(filename, 30);
-            localParts.push(localHeader, bytes);
+            localParts.push(localHeader, compressed);
 
             const centralHeader = new Uint8Array(46 + filename.length);
             const centralView = new DataView(centralHeader.buffer);
             write32(centralView, 0, 0x02014b50);
             write16(centralView, 4, 20);
             write16(centralView, 6, 20);
-            write16(centralView, 8, 0x0800);
-            write16(centralView, 10, 0);
-            write16(centralView, 12, dosTime);
-            write16(centralView, 14, dosDate);
-            write32(centralView, 16, checksum);
-            write32(centralView, 20, bytes.length);
-            write32(centralView, 24, bytes.length);
+            write16(centralView, 8, flags);
+            write16(centralView, 10, file.method);
+            write16(centralView, 12, file.modTime);
+            write16(centralView, 14, file.modDate);
+            write32(centralView, 16, file.crc);
+            write32(centralView, 20, compressed.length);
+            write32(centralView, 24, file.uncompressedSize);
             write16(centralView, 28, filename.length);
             write16(centralView, 30, 0);
             write16(centralView, 32, 0);
             write16(centralView, 34, 0);
             write16(centralView, 36, 0);
-            write32(centralView, 38, 0);
+            write32(centralView, 38, file.externalAttributes);
             write32(centralView, 42, localOffset);
             centralHeader.set(filename, 46);
             centralParts.push(centralHeader);
-            localOffset += localHeader.length + bytes.length;
+            localOffset += localHeader.length + compressed.length;
         }
 
         const centralSize = centralParts.reduce((size, part) => size + part.length, 0);
@@ -373,41 +382,33 @@ ${rowBreaks}
         });
     }
 
-    function exportQuoteWorkbook({ project, units, costMultiplier }) {
+    async function exportQuoteWorkbook({ project, units, costMultiplier }) {
         if (!Array.isArray(units) || units.length === 0) {
             throw new Error("Add at least one unit before exporting the quote.");
         }
 
         const exportDate = new Date().toISOString().slice(0, 10);
-        const files = [
-            ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-</Types>`],
-            ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>`],
-            ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<bookViews><workbookView activeTab="0" firstSheet="0"/></bookViews>
-<sheets><sheet name="Quote Page 0" sheetId="1" r:id="rId1"/><sheet name="Item EC" sheetId="2" r:id="rId2"/></sheets>
-</workbook>`],
-            ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
-<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`],
-            ["xl/styles.xml", stylesXml()],
-            ["xl/worksheets/sheet1.xml", makeQuoteSheet(project, units, costMultiplier, exportDate)],
-            ["xl/worksheets/sheet2.xml", makeItemEcSheet(project, units, exportDate)]
-        ];
+        const templateResponse = await fetch(new URL("quote-template.xlsx", document.baseURI));
+        if (!templateResponse.ok) {
+            throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
+        }
+        const files = readZipEntries(await templateResponse.arrayBuffer());
+        const quoteSheet = files.find(file => file.name === "xl/worksheets/sheet1.xml");
+        const itemSheet = files.find(file => file.name === "xl/worksheets/sheet2.xml");
+        if (!quoteSheet || !itemSheet) {
+            throw new Error("The quote template is missing a required worksheet.");
+        }
+        for (const [file, content] of [
+            [quoteSheet, makeQuoteSheet(project, units, costMultiplier, exportDate)],
+            [itemSheet, makeItemEcSheet(project, units, exportDate)]
+        ]) {
+            const bytes = encoder.encode(content);
+            file.method = 0;
+            file.flags = 0;
+            file.crc = crc32(bytes);
+            file.compressed = bytes;
+            file.uncompressedSize = bytes.length;
+        }
         const blob = zipFiles(files);
         const anchor = document.createElement("a");
         const quoteName = String(project.quoteNumber || project.projectName || "SelectSGS-Quote")

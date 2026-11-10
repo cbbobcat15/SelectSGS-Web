@@ -748,7 +748,7 @@
         <section id="unit-list" class="unit-list" aria-labelledby="unit-list-heading" hidden>
             <div class="unit-list-heading">
                 <h2 id="unit-list-heading">Item Summary</h2>
-                <button id="export-quote" type="button" disabled>Export Excel Quote</button>
+                <button id="export-quote" type="button" disabled>Export Quote</button>
             </div>
             <div class="unit-table-wrapper">
                 <table>
@@ -986,7 +986,7 @@ function updateQuotePrices() {
     }
 }
 
-exportQuoteButton.addEventListener("click", () => {
+exportQuoteButton.addEventListener("click", async () => {
     try {
         const units = unitRows.flatMap(row => {
             const unit = quotedUnits[row.dataset.unitRow];
@@ -1005,7 +1005,7 @@ exportQuoteButton.addEventListener("click", () => {
                     }))
             }];
         });
-        window.exportQuoteWorkbook({
+        await window.exportQuoteWorkbook({
             project: getProjectData(),
             units,
             costMultiplier
