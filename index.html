@@ -319,6 +319,11 @@
             overflow-x: auto;
         }
 
+        .unit-list tbody tr[aria-selected="true"] {
+            outline: 2px solid #004f9f;
+            outline-offset: -2px;
+        }
+
         .unit-list table {
             width: 100%;
             border-collapse: collapse;
@@ -387,6 +392,22 @@
         .unit-list .select-unit:hover {
             background: #dceeff;
             color: #003a75;
+        }
+
+        .line-item-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .line-item-actions[hidden] {
+            display: none;
+        }
+
+        .line-item-actions button {
+            margin: 0;
         }
 
         .unit-details {
@@ -769,6 +790,10 @@
             </div>
             <p id="quote-total" class="quote-total"></p>
             <p id="quote-pricing-error" class="price-note" role="alert" hidden></p>
+            <div id="line-item-actions" class="line-item-actions" hidden>
+                <button id="copy-line-item" type="button"></button>
+                <button id="delete-line-item" type="button"></button>
+            </div>
         </section>
 
         <section id="options-panel" class="options-panel" aria-labelledby="options-heading" hidden>
@@ -812,6 +837,9 @@ const deleteProjectButton = document.getElementById("delete-project");
 const unitList = document.getElementById("unit-list");
 const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 const exportQuoteButton = document.getElementById("export-quote");
+const lineItemActions = document.getElementById("line-item-actions");
+const copyLineItemButton = document.getElementById("copy-line-item");
+const deleteLineItemButton = document.getElementById("delete-line-item");
 const optionsPanel = document.getElementById("options-panel");
 const multiplierInput = document.getElementById("cost-multiplier");
 const optionRows = document.getElementById("option-rows");
@@ -850,6 +878,7 @@ function renderUnitDetails(unitNumber) {
         details.hidden = true;
         emptyMessage.hidden = false;
         optionsPanel.hidden = true;
+        updateLineItemActions();
         return;
     }
 
@@ -906,6 +935,98 @@ function renderUnitDetails(unitNumber) {
 
     emptyMessage.hidden = true;
     details.hidden = false;
+    updateLineItemActions();
+    updateQuotePrices();
+}
+
+function updateLineItemActions() {
+    const unit = Number.isInteger(activeUnitNumber) ? quotedUnits[activeUnitNumber] : null;
+    const isSelected = Boolean(unit);
+    lineItemActions.hidden = !isSelected;
+    if (!isSelected) return;
+
+    copyLineItemButton.textContent = `Copy Line Item #${activeUnitNumber}`;
+    deleteLineItemButton.textContent = `Delete Line Item #${activeUnitNumber}`;
+    copyLineItemButton.disabled = unitRows.every(row => quotedUnits[row.dataset.unitRow]);
+}
+
+function selectLineItem(unitNumber) {
+    activeUnitNumber = Number(unitNumber);
+    for (const row of unitRows) {
+        row.setAttribute("aria-selected", String(Number(row.dataset.unitRow) === activeUnitNumber));
+    }
+    renderUnitDetails(activeUnitNumber);
+}
+
+function copySelectedLineItem() {
+    const sourceUnit = quotedUnits[activeUnitNumber];
+    if (!sourceUnit) return;
+
+    const destinationRow = unitRows.find(row => !quotedUnits[row.dataset.unitRow]);
+    if (!destinationRow) return;
+
+    const destinationNumber = Number(destinationRow.dataset.unitRow);
+    const sourceRow = unitRows[activeUnitNumber - 1];
+    const copy = JSON.parse(JSON.stringify(sourceUnit));
+    copy.unitNumber = destinationNumber;
+    copy.location = sourceRow.querySelector('[data-unit-field="location"]').value;
+    copy.tag = sourceRow.querySelector('[data-unit-field="tag"]').value;
+    quotedUnits[destinationNumber] = copy;
+
+    destinationRow.querySelector('[data-unit-field="location"]').value = copy.location;
+    destinationRow.querySelector('[data-unit-field="tag"]').value = copy.tag;
+    destinationRow.querySelector(".select-unit").textContent = "Change Unit";
+
+    if (!saveQuotedUnits()) return;
+    selectLineItem(destinationNumber);
+    updateQuotePrices();
+}
+
+function deleteSelectedLineItem() {
+    if (!quotedUnits[activeUnitNumber]) return;
+
+    const remainingUnits = unitRows.flatMap(row => {
+        const unit = quotedUnits[row.dataset.unitRow];
+        if (!unit || Number(row.dataset.unitRow) === activeUnitNumber) return [];
+        return [{
+            unit: JSON.parse(JSON.stringify(unit)),
+            location: row.querySelector('[data-unit-field="location"]').value,
+            tag: row.querySelector('[data-unit-field="tag"]').value
+        }];
+    });
+
+    quotedUnits = {};
+    for (const row of unitRows) {
+        row.querySelector('[data-unit-field="location"]').value = "";
+        row.querySelector('[data-unit-field="tag"]').value = "";
+        row.querySelector(".select-unit").textContent = "Click to Select";
+    }
+
+    remainingUnits.forEach((item, index) => {
+        const row = unitRows[index];
+        const unitNumber = Number(row.dataset.unitRow);
+        item.unit.unitNumber = unitNumber;
+        item.unit.location = item.location;
+        item.unit.tag = item.tag;
+        quotedUnits[unitNumber] = item.unit;
+        row.querySelector('[data-unit-field="location"]').value = item.location;
+        row.querySelector('[data-unit-field="tag"]').value = item.tag;
+        row.querySelector(".select-unit").textContent = "Change Unit";
+    });
+
+    const nextSelection = Math.min(activeUnitNumber, remainingUnits.length);
+    if (!saveQuotedUnits()) return;
+    if (nextSelection > 0) {
+        selectLineItem(nextSelection);
+    } else {
+        activeUnitNumber = null;
+        for (const row of unitRows) row.setAttribute("aria-selected", "false");
+        document.getElementById("unit-details-list").replaceChildren();
+        document.getElementById("unit-details-list").hidden = true;
+        document.getElementById("unit-details-empty").hidden = false;
+        optionsPanel.hidden = true;
+        updateLineItemActions();
+    }
     updateQuotePrices();
 }
 
@@ -992,6 +1113,7 @@ function renderOptionRows(options, unit) {
 function saveQuotedUnits() {
     try {
         sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(quotedUnits));
+        sessionStorage.setItem("selectsgs-unit-rows", JSON.stringify(getUnitData()));
     } catch (error) {
         formError.textContent = "Quote line items could not be saved in this browser. Check your browser storage settings and try again.";
         formError.hidden = false;
@@ -1008,7 +1130,10 @@ function updateQuotePrices() {
     for (const row of unitRows) {
         const unitNumber = row.dataset.unitRow;
         const unit = quotedUnits[unitNumber];
-        if (!unit) continue;
+        if (!unit) {
+            row.querySelector("[data-unit-price]").textContent = "—";
+            continue;
+        }
 
         const linePrice = getUnitLinePrice(unit);
         if (linePrice === null) {
@@ -1475,18 +1600,19 @@ for (const field of projectFields) {
 for (const row of unitRows) {
     const unitNumber = row.dataset.unitRow;
     const quotedUnit = quotedUnits[unitNumber];
+    row.setAttribute("aria-selected", "false");
     if (quotedUnit) {
         row.querySelector(".select-unit").textContent = "Change Unit";
     }
 
     row.addEventListener("click", event => {
-        if (event.target.closest("input, button")) return;
-        renderUnitDetails(unitNumber);
+        if (event.target.closest("button")) return;
+        selectLineItem(unitNumber);
     });
 
     for (const field of row.querySelectorAll("[data-unit-field]")) {
         field.addEventListener("focus", () => {
-            renderUnitDetails(unitNumber);
+            selectLineItem(unitNumber);
         });
         field.addEventListener("input", () => {
             saveProjectData();
@@ -1509,6 +1635,9 @@ for (const row of unitRows) {
         window.location.href = `unit-selection.html?unit=${unitNumber}`;
     });
 }
+
+copyLineItemButton.addEventListener("click", copySelectedLineItem);
+deleteLineItemButton.addEventListener("click", deleteSelectedLineItem);
 
 updateQuotePrices();
 
@@ -1571,7 +1700,7 @@ optionRows.addEventListener("change", event => {
 validateCostMultiplier();
 
 if (activeUnitNumber) {
-    renderUnitDetails(activeUnitNumber);
+    selectLineItem(activeUnitNumber);
 }
 
 updateUnitList();
