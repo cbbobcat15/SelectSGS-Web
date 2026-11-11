@@ -74,25 +74,39 @@
         return cell;
     }
 
-    function setLineDescriptionMerge(sheet, rowNumber, indented) {
+    function setQuoteMerge(sheet, reference, rowNumber) {
         const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
         if (!mergeCells) throw new Error("The quote template is missing its merged-cell definitions.");
 
-        const target = `${indented ? "C" : "B"}${rowNumber}:H${rowNumber}`;
         for (const merge of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
-            const reference = merge.getAttribute("ref");
-            const lineMerge = reference.match(/^[BC](\d+):H(\d+)$/);
-            if (lineMerge && Number(lineMerge[1]) === rowNumber && reference !== target) {
+            const existing = merge.getAttribute("ref");
+            if (/^[BCD]\d+:H\d+$/.test(existing) &&
+                Number(existing.match(/\d+/)?.[0]) === rowNumber && existing !== reference) {
                 mergeCells.removeChild(merge);
             }
         }
         if (!Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))
-            .some(merge => merge.getAttribute("ref") === target)) {
+            .some(merge => merge.getAttribute("ref") === reference)) {
             const merge = sheet.createElementNS(spreadsheetNamespace, "mergeCell");
-            merge.setAttribute("ref", target);
+            merge.setAttribute("ref", reference);
             mergeCells.appendChild(merge);
         }
         mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
+    }
+
+    function configureQuotePageHeaders(sheet) {
+        const sheetData = getSheetData(sheet);
+        for (const [cell, label] of [
+            ["B10", "Line Item #"],
+            ["C10", "Location"],
+            ["D10", "Model #"]
+        ]) {
+            const row = getRow(sheetData, 10);
+            const headerCell = row && findCell(row, cell);
+            if (!headerCell) throw new Error(`The quote template is missing cell ${cell}.`);
+            writeCell(headerCell, label);
+        }
+        setQuoteMerge(sheet, "D10:H10", 10);
     }
 
     function writeCell(cell, value) {
@@ -119,6 +133,20 @@
         const cell = row && findCell(row, reference);
         if (!cell) throw new Error(`The quote template is missing cell ${reference}.`);
         writeCell(cell, value);
+    }
+
+    function applyRowStyle(sheetData, rowNumber, templateRowNumber) {
+        const row = getRow(sheetData, rowNumber);
+        const templateRow = getRow(sheetData, templateRowNumber);
+        if (!row || !templateRow) throw new Error("The quote template is missing a formatted line-item row.");
+
+        for (const cell of templateRow.getElementsByTagNameNS(spreadsheetNamespace, "c")) {
+            const reference = cell.getAttribute("r");
+            const column = reference.match(/^[A-Z]+/)[0];
+            const target = ensureCell(sheetData, rowNumber, `${column}${rowNumber}`);
+            if (cell.hasAttribute("s")) target.setAttribute("s", cell.getAttribute("s"));
+            else target.removeAttribute("s");
+        }
     }
 
     function findRelationship(document, relationshipId, namespace) {
@@ -178,7 +206,7 @@
         const titles = properties.getElementsByTagNameNS(propertiesNamespace, "TitlesOfParts")[0]
             ?.getElementsByTagNameNS(vectorNamespace, "vector")[0];
         if (titles) {
-            titles.replaceChildren();
+            while (titles.firstChild) titles.removeChild(titles.firstChild);
             titles.setAttribute("size", String(sheetNames.length));
             for (const name of sheetNames) {
                 const title = properties.createElementNS(vectorNamespace, "vt:lpstr");
@@ -284,7 +312,12 @@
         const sheetData = getSheetData(sheet);
         let row = getRow(sheetData, rowNumber);
         if (!row) {
-            const templateRow = getRow(sheetData, line.indented ? 13 : 12);
+            const templateRowNumber = line.type === "unit"
+                ? 12
+                : line.type === "option"
+                    ? (line.styleRow ?? 13)
+                    : 16;
+            const templateRow = getRow(sheetData, templateRowNumber);
             if (!templateRow) throw new Error("The quote template is missing its formatted line-item row.");
             row = templateRow.cloneNode(true);
             const oldRowNumber = Number(row.getAttribute("r"));
@@ -306,23 +339,37 @@
             mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
         }
 
-        for (const [column, value] of [
-            ["A", line.quantity], ["I", line.netEach], ["K", line.extended]
-        ]) {
+        const templateRowNumber = line.type === "unit"
+            ? 12
+            : line.type === "option"
+                ? (line.styleRow ?? 13)
+                : 16;
+        applyRowStyle(sheetData, rowNumber, templateRowNumber);
+        for (const [column, value] of [["A", line.quantity], ["I", line.netEach], ["K", line.extended]]) {
             setCellValue(sheetData, rowNumber, `${column}${rowNumber}`, value);
         }
-        for (const column of ["B", "C"]) {
+        for (const column of ["B", "C", "D"]) {
             const cell = findCell(row, `${column}${rowNumber}`);
             if (cell) writeCell(cell, "");
         }
-        if (line.description) {
-            writeCell(ensureCell(sheetData, rowNumber, `${line.indented ? "C" : "B"}${rowNumber}`), line.description);
+        if (line.type === "unit") {
+            for (const [column, value] of [
+                ["B", line.unitNumber], ["C", line.location], ["D", line.model]
+            ]) {
+                writeCell(ensureCell(sheetData, rowNumber, `${column}${rowNumber}`), value);
+            }
+            setQuoteMerge(sheet, `D${rowNumber}:H${rowNumber}`, rowNumber);
+        } else if (line.description) {
+            writeCell(ensureCell(sheetData, rowNumber, `C${rowNumber}`), line.description);
+            setQuoteMerge(sheet, `C${rowNumber}:H${rowNumber}`, rowNumber);
+        } else {
+            setQuoteMerge(sheet, `B${rowNumber}:H${rowNumber}`, rowNumber);
         }
-        setLineDescriptionMerge(sheet, rowNumber, line.indented);
     }
 
     function makeQuoteSheet(templateXml, project, units, exportDate) {
         const sheet = parseWorksheet(templateXml);
+        configureQuotePageHeaders(sheet);
         const sheetData = getSheetData(sheet);
         const projectCells = [
             [6, "C6", project.customer], [6, "I6", project.contact],
@@ -334,26 +381,36 @@
         const lines = [];
         for (const [index, unit] of units.entries()) {
             const basePrice = Number(unit.baseNetPrice) || 0;
-            const description = [
-                `${unit.productLine ?? "IEC"} Evaporative Condenser - ${unit.model}`,
-                unit.location ? `Location: ${unit.location}` : "",
-                unit.tag ? `Unit Tag: ${unit.tag}` : "",
-                `${Number(unit.requiredCapacity).toLocaleString()} MBH - ${unit.refrigerant}`
-            ].filter(Boolean).join(" | ");
-            lines.push({ quantity: 1, description, netEach: basePrice, extended: basePrice, indented: false });
+            lines.push({
+                type: "unit",
+                quantity: 1,
+                unitNumber: unit.unitNumber,
+                location: unit.location,
+                model: unit.model,
+                netEach: basePrice,
+                extended: basePrice
+            });
 
-            for (const option of (unit.options ?? []).filter(item => item.optionId)) {
+            const options = (unit.options ?? []).filter(item => item.optionId);
+            for (const [optionIndex, option] of options.entries()) {
                 const name = option.optionId === "hdg-internal-service-platform"
                     ? "HDG Internal Service Platform"
                     : option.optionId;
                 const quantity = Number(option.quantity) || 1;
                 const netEach = Number(option.netEachPrice) || 0;
-                lines.push({ quantity, description: name, netEach, extended: quantity * netEach, indented: true });
+                lines.push({
+                    type: "option",
+                    styleRow: 13 + (optionIndex % 2),
+                    quantity,
+                    description: name,
+                    netEach,
+                    extended: quantity * netEach
+                });
             }
             if (index < units.length - 1) {
                 lines.push(
-                    { quantity: "", description: "", netEach: "", extended: "", indented: false },
-                    { quantity: "", description: "", netEach: "", extended: "", indented: false }
+                    { type: "blank", quantity: "", netEach: "", extended: "" },
+                    { type: "blank", quantity: "", netEach: "", extended: "" }
                 );
             }
         }
@@ -363,12 +420,12 @@
         for (let index = 0; index < Math.max(3, lines.length); index++) {
             const rowNumber = 12 + index;
             addQuoteLine(sheet, rowNumber, lines[index] ?? {
-                quantity: "", description: "", netEach: "", extended: "", indented: false
+                type: "blank", quantity: "", netEach: "", extended: ""
             });
         }
 
         let total = 0;
-        for (const line of lines) total += line.extended;
+        for (const line of lines) total += Number(line.extended) || 0;
         const finalSheetData = getSheetData(sheet);
         setCellValue(finalSheetData, totalRow, `K${totalRow}`, total);
         return serializeXml(sheet);
@@ -736,7 +793,7 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261111-1456");
+        templateUrl.searchParams.set("v", "20261111-1507");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
