@@ -530,7 +530,7 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261111-1343");
+        templateUrl.searchParams.set("v", "20261111-1355");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
