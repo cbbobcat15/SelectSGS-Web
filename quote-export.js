@@ -321,7 +321,7 @@
             if (offset) cloneItemPage(sheet, offset);
             populateItemPage(sheet, project, unit, offset);
         });
-        return serializeWorksheet(sheet);
+        return serializeXml(sheet);
     }
 
     function crc32(bytes) {
