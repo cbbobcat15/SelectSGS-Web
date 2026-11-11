@@ -45,6 +45,52 @@
             .find(cell => cell.getAttribute("r") === reference);
     }
 
+    function getColumnNumber(reference) {
+        return reference.match(/[A-Z]+/)[0].split("").reduce((number, character) =>
+            number * 26 + character.charCodeAt(0) - 64, 0
+        );
+    }
+
+    function ensureCell(sheetData, rowNumber, reference) {
+        const row = getRow(sheetData, rowNumber);
+        const existingCell = row && findCell(row, reference);
+        if (existingCell) return existingCell;
+        if (!row) throw new Error(`The quote template is missing row ${rowNumber}.`);
+
+        const column = reference.match(/[A-Z]+/)[0];
+        const styleRow = getRow(sheetData, column === "B" ? 12 : 13);
+        const styleCell = styleRow && findCell(styleRow, `${column}${column === "B" ? 12 : 13}`);
+        if (!styleCell) throw new Error(`The quote template is missing a formatted ${column} line-item cell.`);
+
+        const cell = styleCell.cloneNode(true);
+        cell.setAttribute("r", reference);
+        const nextCell = Array.from(row.getElementsByTagNameNS(spreadsheetNamespace, "c"))
+            .find(existing => getColumnNumber(existing.getAttribute("r")) > getColumnNumber(reference));
+        row.insertBefore(cell, nextCell ?? null);
+        return cell;
+    }
+
+    function setLineDescriptionMerge(sheet, rowNumber, indented) {
+        const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
+        if (!mergeCells) throw new Error("The quote template is missing its merged-cell definitions.");
+
+        const target = `${indented ? "C" : "B"}${rowNumber}:H${rowNumber}`;
+        for (const merge of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
+            const reference = merge.getAttribute("ref");
+            const lineMerge = reference.match(/^[BC](\d+):H(\d+)$/);
+            if (lineMerge && Number(lineMerge[1]) === rowNumber && reference !== target) {
+                mergeCells.removeChild(merge);
+            }
+        }
+        if (!Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))
+            .some(merge => merge.getAttribute("ref") === target)) {
+            const merge = sheet.createElementNS(spreadsheetNamespace, "mergeCell");
+            merge.setAttribute("ref", target);
+            mergeCells.appendChild(merge);
+        }
+        mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
+    }
+
     function writeCell(cell, value) {
         while (cell.firstChild) cell.removeChild(cell.firstChild);
         if (typeof value === "number" && Number.isFinite(value)) {
@@ -97,13 +143,18 @@
                 merge.setAttribute("ref", shiftReference(reference, startRow, offset));
             }
         }
+
+        const dimension = sheet.getElementsByTagNameNS(spreadsheetNamespace, "dimension")[0];
+        if (dimension) {
+            dimension.setAttribute("ref", shiftReference(dimension.getAttribute("ref"), startRow, offset));
+        }
     }
 
     function addQuoteLine(sheet, rowNumber, line) {
         const sheetData = getSheetData(sheet);
         let row = getRow(sheetData, rowNumber);
         if (!row) {
-            const templateRow = getRow(sheetData, 15);
+            const templateRow = getRow(sheetData, line.indented ? 13 : 12);
             if (!templateRow) throw new Error("The quote template is missing its formatted line-item row.");
             row = templateRow.cloneNode(true);
             const oldRowNumber = Number(row.getAttribute("r"));
@@ -126,20 +177,27 @@
         }
 
         for (const [column, value] of [
-            ["A", line.quantity], ["B", line.description],
-            ["I", line.netEach], ["K", line.extended]
+            ["A", line.quantity], ["I", line.netEach], ["K", line.extended]
         ]) {
             setCellValue(sheetData, rowNumber, `${column}${rowNumber}`, value);
         }
+        for (const column of ["B", "C"]) {
+            const cell = findCell(row, `${column}${rowNumber}`);
+            if (cell) writeCell(cell, "");
+        }
+        if (line.description) {
+            writeCell(ensureCell(sheetData, rowNumber, `${line.indented ? "C" : "B"}${rowNumber}`), line.description);
+        }
+        setLineDescriptionMerge(sheet, rowNumber, line.indented);
     }
 
     function makeQuoteSheet(templateXml, project, units, exportDate) {
         const sheet = parseWorksheet(templateXml);
         const sheetData = getSheetData(sheet);
         const projectCells = [
-            [7, "C7", project.customer], [7, "I7", project.contact],
-            [8, "C8", project.projectName], [8, "I8", project.preparedBy],
-            [9, "C9", project.quoteNumber], [9, "I9", exportDate]
+            [6, "C6", project.customer], [6, "I6", project.contact],
+            [7, "C7", project.projectName], [7, "I7", project.preparedBy],
+            [8, "C8", project.quoteNumber], [8, "I8", exportDate]
         ];
         for (const [row, cell, value] of projectCells) setCellValue(sheetData, row, cell, value);
 
@@ -152,7 +210,7 @@
                 unit.tag ? `Unit Tag: ${unit.tag}` : "",
                 `${Number(unit.requiredCapacity).toLocaleString()} MBH - ${unit.refrigerant}`
             ].filter(Boolean).join(" | ");
-            lines.push({ quantity: 1, description, netEach: basePrice, extended: basePrice });
+            lines.push({ quantity: 1, description, netEach: basePrice, extended: basePrice, indented: false });
 
             for (const option of (unit.options ?? []).filter(item => item.optionId)) {
                 const name = option.optionId === "hdg-internal-service-platform"
@@ -160,16 +218,16 @@
                     : option.optionId;
                 const quantity = Number(option.quantity) || 1;
                 const netEach = Number(option.netEachPrice) || 0;
-                lines.push({ quantity, description: name, netEach, extended: quantity * netEach });
+                lines.push({ quantity, description: name, netEach, extended: quantity * netEach, indented: true });
             }
         }
 
-        const totalRow = Math.max(63, 14 + lines.length);
-        shiftRows(sheet, 63, totalRow - 63);
+        const totalRow = Math.max(61, 12 + lines.length);
+        shiftRows(sheet, 61, totalRow - 61);
         for (let index = 0; index < Math.max(3, lines.length); index++) {
-            const rowNumber = 13 + index;
+            const rowNumber = 12 + index;
             addQuoteLine(sheet, rowNumber, lines[index] ?? {
-                quantity: "", description: "", netEach: "", extended: ""
+                quantity: "", description: "", netEach: "", extended: "", indented: false
             });
         }
 
@@ -422,7 +480,7 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261110-2033");
+        templateUrl.searchParams.set("v", "20261111-1328");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
