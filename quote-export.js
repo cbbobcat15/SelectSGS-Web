@@ -94,21 +94,6 @@
         mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
     }
 
-    function configureQuotePageHeaders(sheet) {
-        const sheetData = getSheetData(sheet);
-        for (const [cell, label] of [
-            ["B10", "Line Item #"],
-            ["C10", "Location"],
-            ["D10", "Model #"]
-        ]) {
-            const row = getRow(sheetData, 10);
-            const headerCell = row && findCell(row, cell);
-            if (!headerCell) throw new Error(`The quote template is missing cell ${cell}.`);
-            writeCell(headerCell, label);
-        }
-        setQuoteMerge(sheet, "D10:H10", 10);
-    }
-
     function writeCell(cell, value) {
         while (cell.firstChild) cell.removeChild(cell.firstChild);
         if (typeof value === "number" && Number.isFinite(value)) {
@@ -353,12 +338,8 @@
             if (cell) writeCell(cell, "");
         }
         if (line.type === "unit") {
-            for (const [column, value] of [
-                ["B", line.unitNumber], ["C", line.location], ["D", line.model]
-            ]) {
-                writeCell(ensureCell(sheetData, rowNumber, `${column}${rowNumber}`), value);
-            }
-            setQuoteMerge(sheet, `D${rowNumber}:H${rowNumber}`, rowNumber);
+            writeCell(ensureCell(sheetData, rowNumber, `B${rowNumber}`), line.description);
+            setQuoteMerge(sheet, `B${rowNumber}:H${rowNumber}`, rowNumber);
         } else if (line.description) {
             writeCell(ensureCell(sheetData, rowNumber, `C${rowNumber}`), line.description);
             setQuoteMerge(sheet, `C${rowNumber}:H${rowNumber}`, rowNumber);
@@ -369,7 +350,6 @@
 
     function makeQuoteSheet(templateXml, project, units, exportDate) {
         const sheet = parseWorksheet(templateXml);
-        configureQuotePageHeaders(sheet);
         const sheetData = getSheetData(sheet);
         const projectCells = [
             [6, "C6", project.customer], [6, "I6", project.contact],
@@ -384,9 +364,7 @@
             lines.push({
                 type: "unit",
                 quantity: 1,
-                unitNumber: unit.unitNumber,
-                location: unit.location,
-                model: unit.model,
+                description: `Line Item #${unit.unitNumber}: Location: ${unit.location} | Model #: ${unit.model}`,
                 netEach: basePrice,
                 extended: basePrice
             });
