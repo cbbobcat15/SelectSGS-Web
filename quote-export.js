@@ -121,6 +121,132 @@
         writeCell(cell, value);
     }
 
+    function findRelationship(document, relationshipId, namespace) {
+        return Array.from(document.getElementsByTagNameNS(namespace, "Relationship"))
+            .find(relationship => relationship.getAttribute("Id") === relationshipId);
+    }
+
+    function resolvePartPath(sourcePart, target) {
+        const parts = sourcePart.split("/").slice(0, -1);
+        for (const part of target.split("/")) {
+            if (!part || part === ".") continue;
+            if (part === "..") parts.pop();
+            else parts.push(part);
+        }
+        return parts.join("/");
+    }
+
+    function makeRelativePartPath(sourcePart, targetPart) {
+        const source = sourcePart.split("/").slice(0, -1);
+        const target = targetPart.split("/");
+        while (source.length && target.length && source[0] === target[0]) {
+            source.shift();
+            target.shift();
+        }
+        return [...source.map(() => ".."), ...target].join("/");
+    }
+
+    function getRelationshipsPath(partPath) {
+        const separator = partPath.lastIndexOf("/");
+        return `${partPath.slice(0, separator)}/_rels/${partPath.slice(separator + 1)}.rels`;
+    }
+
+    function cloneZipEntry(entry, name) {
+        return { ...entry, name, compressed: entry.compressed.slice() };
+    }
+
+    function addContentTypeOverride(document, partName, contentType) {
+        const contentTypesNamespace = "http://schemas.openxmlformats.org/package/2006/content-types";
+        const overrides = Array.from(document.getElementsByTagNameNS(contentTypesNamespace, "Override"));
+        if (overrides.some(override => override.getAttribute("PartName") === partName)) return;
+        const override = document.createElementNS(contentTypesNamespace, "Override");
+        override.setAttribute("PartName", partName);
+        override.setAttribute("ContentType", contentType);
+        document.documentElement.appendChild(override);
+    }
+
+    async function updateWorkbookProperties(files, sheetNames) {
+        const appProperties = files.find(file => file.name === "docProps/app.xml");
+        if (!appProperties) return;
+
+        const properties = parseXml(
+            await readZipEntryText(appProperties),
+            "The quote template contains invalid application properties XML."
+        );
+        const propertiesNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
+        const vectorNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes";
+        const titles = properties.getElementsByTagNameNS(propertiesNamespace, "TitlesOfParts")[0]
+            ?.getElementsByTagNameNS(vectorNamespace, "vector")[0];
+        if (titles) {
+            titles.replaceChildren();
+            titles.setAttribute("size", String(sheetNames.length));
+            for (const name of sheetNames) {
+                const title = properties.createElementNS(vectorNamespace, "vt:lpstr");
+                title.textContent = name;
+                titles.appendChild(title);
+            }
+        }
+
+        const headingPairs = properties.getElementsByTagNameNS(propertiesNamespace, "HeadingPairs")[0]
+            ?.getElementsByTagNameNS(vectorNamespace, "vector")[0];
+        const worksheetCount = headingPairs?.getElementsByTagNameNS(vectorNamespace, "i4")[0];
+        if (worksheetCount) worksheetCount.textContent = String(sheetNames.length);
+
+        replaceZipEntryText(appProperties, serializeXml(properties));
+    }
+
+    function getNextPartNumber(files, directory, prefix, extension) {
+        const expression = new RegExp(`^${directory}/${prefix}(\\d+)\\.${extension}$`);
+        return files.reduce((max, file) => {
+            const match = file.name.match(expression);
+            return match ? Math.max(max, Number(match[1])) : max;
+        }, 0) + 1;
+    }
+
+    async function cloneWorksheetRelationships(files, sourceSheetPath, targetSheetPath, contentTypes) {
+        const sourceRelationshipsPath = getRelationshipsPath(sourceSheetPath);
+        const sourceRelationships = files.find(file => file.name === sourceRelationshipsPath);
+        if (!sourceRelationships) return;
+
+        const relationshipNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
+        const relationships = parseXml(
+            await readZipEntryText(sourceRelationships),
+            "The quote template contains invalid worksheet relationship XML."
+        );
+        const drawingRelationship = Array.from(relationships.getElementsByTagNameNS(relationshipNamespace, "Relationship"))
+            .find(relationship => relationship.getAttribute("Type").endsWith("/drawing"));
+        if (drawingRelationship) {
+            const sourceDrawingPath = resolvePartPath(sourceSheetPath, drawingRelationship.getAttribute("Target"));
+            const sourceDrawing = files.find(file => file.name === sourceDrawingPath);
+            if (sourceDrawing) {
+                const drawingNumber = getNextPartNumber(files, "xl/drawings", "drawing", "xml");
+                const targetDrawingPath = `xl/drawings/drawing${drawingNumber}.xml`;
+                files.push(cloneZipEntry(sourceDrawing, targetDrawingPath));
+                drawingRelationship.setAttribute("Target", makeRelativePartPath(targetSheetPath, targetDrawingPath));
+
+                const sourceDrawingRelationshipsPath = getRelationshipsPath(sourceDrawingPath);
+                const sourceDrawingRelationships = files.find(file => file.name === sourceDrawingRelationshipsPath);
+                if (sourceDrawingRelationships) {
+                    files.push(cloneZipEntry(
+                        sourceDrawingRelationships,
+                        getRelationshipsPath(targetDrawingPath)
+                    ));
+                }
+
+                const sourceDrawingType = Array.from(contentTypes.getElementsByTagNameNS(
+                    "http://schemas.openxmlformats.org/package/2006/content-types", "Override"
+                )).find(override => override.getAttribute("PartName") === `/${sourceDrawingPath}`);
+                if (sourceDrawingType) {
+                    addContentTypeOverride(contentTypes, `/${targetDrawingPath}`, sourceDrawingType.getAttribute("ContentType"));
+                }
+            }
+        }
+
+        const targetRelationships = cloneZipEntry(sourceRelationships, getRelationshipsPath(targetSheetPath));
+        replaceZipEntryText(targetRelationships, serializeXml(relationships));
+        files.push(targetRelationships);
+    }
+
     function shiftReference(reference, startRow, offset) {
         return reference.replace(/(\$?[A-Z]+\$?)(\d+)/g, (match, column, row) =>
             Number(row) >= startRow ? `${column}${Number(row) + offset}` : match
@@ -206,7 +332,7 @@
         for (const [row, cell, value] of projectCells) setCellValue(sheetData, row, cell, value);
 
         const lines = [];
-        for (const unit of units) {
+        for (const [index, unit] of units.entries()) {
             const basePrice = Number(unit.baseNetPrice) || 0;
             const description = [
                 `${unit.productLine ?? "IEC"} Evaporative Condenser - ${unit.model}`,
@@ -223,6 +349,12 @@
                 const quantity = Number(option.quantity) || 1;
                 const netEach = Number(option.netEachPrice) || 0;
                 lines.push({ quantity, description: name, netEach, extended: quantity * netEach, indented: true });
+            }
+            if (index < units.length - 1) {
+                lines.push(
+                    { quantity: "", description: "", netEach: "", extended: "", indented: false },
+                    { quantity: "", description: "", netEach: "", extended: "", indented: false }
+                );
             }
         }
 
@@ -242,50 +374,9 @@
         return serializeXml(sheet);
     }
 
-    function cloneItemPage(sheet, offset) {
+    function populateItemPage(sheet, project, unit) {
         const sheetData = getSheetData(sheet);
-        const pageRows = Array.from(sheetData.getElementsByTagNameNS(spreadsheetNamespace, "row"))
-            .filter(row => Number(row.getAttribute("r")) <= 45)
-            .map(row => row.cloneNode(true));
-        for (const row of pageRows) {
-            const oldRowNumber = Number(row.getAttribute("r"));
-            row.setAttribute("r", String(oldRowNumber + offset));
-            for (const cell of row.getElementsByTagNameNS(spreadsheetNamespace, "c")) {
-                cell.setAttribute("r", shiftReference(cell.getAttribute("r"), 1, offset));
-            }
-            insertRow(sheetData, row);
-        }
-
-        const mergeCells = sheet.getElementsByTagNameNS(spreadsheetNamespace, "mergeCells")[0];
-        for (const original of Array.from(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell"))) {
-            const reference = original.getAttribute("ref");
-            if (Number(reference.match(/\d+/)?.[0]) > 45) continue;
-            const merge = original.cloneNode(true);
-            merge.setAttribute("ref", shiftReference(reference, 1, offset));
-            mergeCells.appendChild(merge);
-        }
-        mergeCells.setAttribute("count", String(mergeCells.getElementsByTagNameNS(spreadsheetNamespace, "mergeCell").length));
-
-        let rowBreaks = sheet.getElementsByTagNameNS(spreadsheetNamespace, "rowBreaks")[0];
-        if (!rowBreaks) {
-            rowBreaks = sheet.createElementNS(spreadsheetNamespace, "rowBreaks");
-            const pageSetup = sheet.getElementsByTagNameNS(spreadsheetNamespace, "pageSetup")[0];
-            const worksheet = sheet.documentElement;
-            if (pageSetup?.nextSibling) worksheet.insertBefore(rowBreaks, pageSetup.nextSibling);
-            else worksheet.appendChild(rowBreaks);
-        }
-        const breakNode = sheet.createElementNS(spreadsheetNamespace, "brk");
-        breakNode.setAttribute("id", String(offset - 1));
-        breakNode.setAttribute("max", "16383");
-        breakNode.setAttribute("man", "1");
-        rowBreaks.appendChild(breakNode);
-        rowBreaks.setAttribute("count", String(rowBreaks.getElementsByTagNameNS(spreadsheetNamespace, "brk").length));
-        rowBreaks.setAttribute("manualBreakCount", rowBreaks.getAttribute("count"));
-    }
-
-    function populateItemPage(sheet, project, unit, offset) {
-        const sheetData = getSheetData(sheet);
-        const set = (row, cell, value) => setCellValue(sheetData, row + offset, `${cell}${row + offset}`, value);
+        const set = (row, cell, value) => setCellValue(sheetData, row, `${cell}${row}`, value);
         set(8, "C", project.customer);
         set(9, "C", project.projectName);
         set(10, "C", project.quoteNumber);
@@ -321,20 +412,122 @@
                 [42, "C", unit.operatingWeightLb], [42, "I", unit.operatingWeightLb],
                 [43, "C", unit.widthFt], [43, "I", unit.widthFt],
                 [44, "C", unit.lengthFt], [44, "I", unit.lengthFt],
-                [45, "C", "N/A"], [45, "I", "N/A"]
+                [45, "C", "N/A"]
             );
         }
         for (const [row, column, value] of descriptionValues) set(row, column, value);
     }
 
-    function makeItemEcSheet(templateXml, project, units) {
+    function makeItemEcSheet(templateXml, project, unit) {
         const sheet = parseWorksheet(templateXml);
-        units.forEach((unit, index) => {
-            const offset = index * 48;
-            if (offset) cloneItemPage(sheet, offset);
-            populateItemPage(sheet, project, unit, offset);
-        });
+        populateItemPage(sheet, project, unit);
         return serializeXml(sheet);
+    }
+
+    async function makeItemSheets(files, project, units, itemSheet) {
+        const workbook = files.find(file => file.name === "xl/workbook.xml");
+        const workbookRelationships = files.find(file => file.name === "xl/_rels/workbook.xml.rels");
+        const contentTypes = files.find(file => file.name === "[Content_Types].xml");
+        if (!workbook || !workbookRelationships || !contentTypes) {
+            throw new Error("The quote template is missing workbook sheet metadata.");
+        }
+
+        const workbookDocument = parseXml(
+            await readZipEntryText(workbook),
+            "The quote template contains invalid workbook XML."
+        );
+        const relationshipsDocument = parseXml(
+            await readZipEntryText(workbookRelationships),
+            "The quote template contains invalid workbook relationship XML."
+        );
+        const contentTypesDocument = parseXml(
+            await readZipEntryText(contentTypes),
+            "The quote template contains invalid content type XML."
+        );
+        const mainNamespace = spreadsheetNamespace;
+        const officeRelationshipNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        const packageRelationshipNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
+        const contentTypeNamespace = "http://schemas.openxmlformats.org/package/2006/content-types";
+        const sheets = workbookDocument.getElementsByTagNameNS(mainNamespace, "sheets")[0];
+        if (!sheets) throw new Error("The quote template is missing its worksheet list.");
+
+        const existingSheets = Array.from(sheets.getElementsByTagNameNS(mainNamespace, "sheet"));
+        const itemSheetNode = existingSheets.find(sheet => sheet.getAttribute("name") === "Item EC");
+        if (!itemSheetNode) throw new Error("The quote template is missing the Item EC worksheet.");
+        const originalRelationshipId = itemSheetNode.getAttributeNS(officeRelationshipNamespace, "id");
+        const originalRelationship = findRelationship(
+            relationshipsDocument,
+            originalRelationshipId,
+            packageRelationshipNamespace
+        );
+        if (!originalRelationship || !originalRelationship.getAttribute("Type").endsWith("/worksheet")) {
+            throw new Error("The quote template Item EC worksheet relationship is invalid.");
+        }
+        const originalSheetPath = resolvePartPath("xl/workbook.xml", originalRelationship.getAttribute("Target"));
+        const originalSheetEntry = files.find(file => file.name === originalSheetPath);
+        if (!originalSheetEntry || originalSheetEntry !== itemSheet) {
+            throw new Error("The quote template Item EC worksheet file could not be found.");
+        }
+        const worksheetContentType = Array.from(contentTypesDocument.getElementsByTagNameNS(
+            contentTypeNamespace, "Override"
+        )).find(override => override.getAttribute("PartName") === `/${originalSheetPath}`);
+        if (!worksheetContentType) throw new Error("The quote template Item EC content type is missing.");
+
+        let nextSheetNumber = getNextPartNumber(files, "xl/worksheets", "sheet", "xml");
+        let nextSheetId = existingSheets.reduce((max, sheet) =>
+            Math.max(max, Number(sheet.getAttribute("sheetId")) || 0), 0
+        ) + 1;
+        let nextRelationshipNumber = Array.from(relationshipsDocument.getElementsByTagNameNS(
+            packageRelationshipNamespace, "Relationship"
+        )).reduce((max, relationship) => {
+            const match = relationship.getAttribute("Id").match(/^rId(\d+)$/);
+            return match ? Math.max(max, Number(match[1])) : max;
+        }, 0) + 1;
+        const templateXml = await readZipEntryText(originalSheetEntry);
+
+        for (const [index, unit] of units.entries()) {
+            const sheetName = `Item #${unit.unitNumber}`;
+            let sheetNode;
+            let sheetPath;
+            let sheetEntry;
+            if (index === 0) {
+                sheetNode = itemSheetNode;
+                sheetPath = originalSheetPath;
+                sheetEntry = originalSheetEntry;
+            } else {
+                sheetPath = `xl/worksheets/sheet${nextSheetNumber++}.xml`;
+                const relationshipId = `rId${nextRelationshipNumber++}`;
+                sheetNode = itemSheetNode.cloneNode(true);
+                sheetNode.setAttribute("sheetId", String(nextSheetId++));
+                sheetNode.setAttributeNS(officeRelationshipNamespace, "r:id", relationshipId);
+                const relationship = workbookDocument.createElementNS(packageRelationshipNamespace, "Relationship");
+                relationship.setAttribute("Id", relationshipId);
+                relationship.setAttribute("Type", originalRelationship.getAttribute("Type"));
+                relationship.setAttribute("Target", makeRelativePartPath("xl/workbook.xml", sheetPath));
+                relationshipsDocument.documentElement.appendChild(relationship);
+                sheets.appendChild(sheetNode);
+
+                sheetEntry = cloneZipEntry(originalSheetEntry, sheetPath);
+                files.push(sheetEntry);
+                await cloneWorksheetRelationships(files, originalSheetPath, sheetPath, contentTypesDocument);
+                addContentTypeOverride(
+                    contentTypesDocument,
+                    `/${sheetPath}`,
+                    worksheetContentType.getAttribute("ContentType")
+                );
+            }
+            sheetNode.setAttribute("name", sheetName);
+            replaceZipEntryText(sheetEntry, makeItemEcSheet(templateXml, project, unit));
+        }
+
+        await updateWorkbookProperties(
+            files,
+            Array.from(sheets.getElementsByTagNameNS(mainNamespace, "sheet"))
+                .map(sheet => sheet.getAttribute("name"))
+        );
+        replaceZipEntryText(workbook, serializeXml(workbookDocument));
+        replaceZipEntryText(workbookRelationships, serializeXml(relationshipsDocument));
+        replaceZipEntryText(contentTypes, serializeXml(contentTypesDocument));
     }
 
     function crc32(bytes) {
@@ -543,7 +736,7 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261111-1355");
+        templateUrl.searchParams.set("v", "20261111-1456");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
@@ -555,12 +748,11 @@
         if (!quoteSheet || !itemSheet) {
             throw new Error("The quote template is missing a required worksheet.");
         }
-        for (const [file, content] of [
-            [quoteSheet, makeQuoteSheet(await readZipEntryText(quoteSheet), project, units, exportDate)],
-            [itemSheet, makeItemEcSheet(await readZipEntryText(itemSheet), project, units)]
-        ]) {
-            replaceZipEntryText(file, content);
-        }
+        replaceZipEntryText(
+            quoteSheet,
+            makeQuoteSheet(await readZipEntryText(quoteSheet), project, units, exportDate)
+        );
+        await makeItemSheets(files, project, units, itemSheet);
         const blob = zipFiles(files);
         const anchor = document.createElement("a");
         const quoteName = String(project.quoteNumber || project.projectName || "SelectSGS-Quote")

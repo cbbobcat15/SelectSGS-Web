@@ -792,7 +792,7 @@
     </div>
 </main>
 </div>
-<script src="quote-export.js?v=20261111-1355"></script>
+<script src="quote-export.js?v=20261111-1456"></script>
 <script>
 const projectForm = document.getElementById("project-form");
 const projectFields = [...projectForm.elements].filter(element => element.name);
@@ -1018,7 +1018,7 @@ exportQuoteButton.addEventListener("click", async () => {
         projectTreeStatus.textContent = "Excel quote exported.";
         formError.hidden = true;
     } catch (error) {
-        formError.textContent = "The Excel quote could not be exported. Try again or check your browser's download settings.";
+        formError.textContent = `The Excel quote could not be exported: ${error.message}`;
         formError.hidden = false;
         console.error("Could not export Excel quote.", error);
     }
