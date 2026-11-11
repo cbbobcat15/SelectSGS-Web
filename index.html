@@ -792,6 +792,7 @@
             <p id="quote-pricing-error" class="price-note" role="alert" hidden></p>
             <div id="line-item-actions" class="line-item-actions" hidden>
                 <button id="copy-line-item" type="button"></button>
+                <button id="edit-line-item" type="button"></button>
                 <button id="delete-line-item" type="button"></button>
             </div>
         </section>
@@ -839,6 +840,7 @@ const unitRows = [...document.querySelectorAll("[data-unit-row]")];
 const exportQuoteButton = document.getElementById("export-quote");
 const lineItemActions = document.getElementById("line-item-actions");
 const copyLineItemButton = document.getElementById("copy-line-item");
+const editLineItemButton = document.getElementById("edit-line-item");
 const deleteLineItemButton = document.getElementById("delete-line-item");
 const optionsPanel = document.getElementById("options-panel");
 const multiplierInput = document.getElementById("cost-multiplier");
@@ -947,6 +949,7 @@ function updateLineItemActions() {
     if (!isSelected) return;
 
     copyLineItemButton.textContent = `Copy Line Item #${activeUnitNumber}`;
+    editLineItemButton.textContent = `Edit Line Item #${activeUnitNumber}`;
     deleteLineItemButton.textContent = `Delete Line Item #${activeUnitNumber}`;
     copyLineItemButton.disabled = unitRows.every(row => quotedUnits[row.dataset.unitRow]);
 }
@@ -976,11 +979,16 @@ function copySelectedLineItem() {
 
     destinationRow.querySelector('[data-unit-field="location"]').value = copy.location;
     destinationRow.querySelector('[data-unit-field="tag"]').value = copy.tag;
-    destinationRow.querySelector(".select-unit").textContent = getUnitSelectionLabel(copy);
+    destinationRow.querySelector(".select-unit").textContent = getUnitProductFamily(copy);
 
     if (!saveQuotedUnits()) return;
     selectLineItem(destinationNumber);
     updateQuotePrices();
+}
+
+function editSelectedLineItem() {
+    if (!quotedUnits[activeUnitNumber] || !saveProjectData()) return;
+    window.location.href = `unit-selection.html?unit=${activeUnitNumber}`;
 }
 
 function deleteSelectedLineItem() {
@@ -1012,7 +1020,7 @@ function deleteSelectedLineItem() {
         quotedUnits[unitNumber] = item.unit;
         row.querySelector('[data-unit-field="location"]').value = item.location;
         row.querySelector('[data-unit-field="tag"]').value = item.tag;
-        row.querySelector(".select-unit").textContent = getUnitSelectionLabel(item.unit);
+        row.querySelector(".select-unit").textContent = getUnitProductFamily(item.unit);
     });
 
     const nextSelection = Math.min(activeUnitNumber, remainingUnits.length);
@@ -1053,9 +1061,8 @@ function getUnitCellCount(unit) {
         : 1;
 }
 
-function getUnitSelectionLabel(unit) {
-    const cellCount = getUnitCellCount(unit);
-    return `Change Unit (${cellCount} ${cellCount === 1 ? "cell" : "cells"})`;
+function getUnitProductFamily(unit) {
+    return unit.productLine ?? (typeof unit.model === "string" ? unit.model.match(/^(IEC|DTC)-/)?.[1] : null) ?? "IEC";
 }
 
 function isPricedProductLine(unit) {
@@ -1620,7 +1627,7 @@ for (const row of unitRows) {
     const quotedUnit = quotedUnits[unitNumber];
     row.setAttribute("aria-selected", "false");
     if (quotedUnit) {
-        row.querySelector(".select-unit").textContent = getUnitSelectionLabel(quotedUnit);
+        row.querySelector(".select-unit").textContent = getUnitProductFamily(quotedUnit);
     }
 
     row.addEventListener("click", event => {
@@ -1655,6 +1662,7 @@ for (const row of unitRows) {
 }
 
 copyLineItemButton.addEventListener("click", copySelectedLineItem);
+editLineItemButton.addEventListener("click", editSelectedLineItem);
 deleteLineItemButton.addEventListener("click", deleteSelectedLineItem);
 
 updateQuotePrices();
