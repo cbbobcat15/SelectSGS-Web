@@ -209,7 +209,7 @@
         for (const unit of units) {
             const basePrice = Number(unit.baseNetPrice) || 0;
             const description = [
-                `Evaporative Condenser - ${unit.model}`,
+                `${unit.productLine ?? "IEC"} Evaporative Condenser - ${unit.model}`,
                 unit.location ? `Location: ${unit.location}` : "",
                 unit.tag ? `Unit Tag: ${unit.tag}` : "",
                 `${Number(unit.requiredCapacity).toLocaleString()} MBH - ${unit.refrigerant}`
@@ -299,18 +299,31 @@
         set(24, "D", "N/A");
         set(25, "D", "N/A");
 
-        const fanMotor = String(unit.fanMotor ?? "").match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
+        const isDtc = unit.productLine === "DTC";
+        const fanMotor = isDtc
+            ? null
+            : String(unit.fanMotor ?? "").match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
         const fansPerCell = fanMotor ? Number(fanMotor[1]) : "N/A";
         const fanHp = fanMotor ? Number(fanMotor[2]) : "N/A";
         const descriptionValues = [
-            [30, "C", "IEC"], [30, "I", fansPerCell],
+            [30, "C", isDtc ? "DTC" : "IEC"], [30, "I", fansPerCell],
             [31, "C", unit.model], [31, "I", fanHp],
             [32, "C", "N/A"], [32, "I", fanMotor ? fansPerCell * fanHp : "N/A"],
-            [33, "C", "N/A"], [33, "I", "N/A"],
+            [33, "C", "N/A"], [33, "I", isDtc ? Number(unit.fanMotor) : "N/A"],
             [34, "C", unit.motorVoltage], [34, "I", "N/A"],
             [35, "C", unit.r717ChargeLb ?? "N/A"], [35, "I", "N/A"],
             [36, "C", unit.airFlowCfm ?? "N/A"], [37, "C", "N/A"]
         ];
+        if (isDtc) {
+            descriptionValues.push(
+                [40, "C", unit.shippingWeightLb], [40, "I", unit.shippingWeightLb],
+                [41, "C", unit.heaviestSectionWeightLb],
+                [42, "C", unit.operatingWeightLb], [42, "I", unit.operatingWeightLb],
+                [43, "C", unit.widthFt], [43, "I", unit.widthFt],
+                [44, "C", unit.lengthFt], [44, "I", unit.lengthFt],
+                [45, "C", "N/A"], [45, "I", "N/A"]
+            );
+        }
         for (const [row, column, value] of descriptionValues) set(row, column, value);
     }
 

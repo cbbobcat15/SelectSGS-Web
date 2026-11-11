@@ -852,6 +852,7 @@ function renderUnitDetails(unitNumber) {
     optionsPanel.hidden = false;
 
     const primaryFields = [
+        ["Product line", unit.productLine ?? "IEC"],
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
         ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
         ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
@@ -867,7 +868,11 @@ function renderUnitDetails(unitNumber) {
         ["Fan motor", `${unit.fanMotor} HP`],
         ["Air flow", `${unit.airFlowCfm?.toLocaleString() ?? "N/A"} CFM`],
         ["Internal coil volume", `${unit.internalCoilVolume ?? "N/A"} ft³`],
-        ["R717 charge", `${unit.r717ChargeLb ?? "N/A"} lb`]
+        ["R717 charge", `${unit.r717ChargeLb ?? "N/A"} lb`],
+        ...(unit.productLine === "DTC" ? [
+            ["Nominal size", unit.nominalSize],
+            ["Rated R717 capacity", `${unit.r717Tons} Tons`]
+        ] : [])
     ];
 
     const model = document.createElement("div");

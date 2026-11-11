@@ -201,22 +201,28 @@
         <a href="index.html">Edit project information</a>
     </section>
 
-    <label>Required Capacity (MBH)</label>
-    <input id="Capacity" type="number" min="1">
-
-    <label>Refrigerant</label>
-    <select id="Refrigerant">
-        <option value="R717">R717</option>
-        <option value="R22">R22</option>
+    <label for="product-line">Product Line</label>
+    <select id="product-line">
+        <option value="IEC">IEC</option>
+        <option value="DTC">DTC</option>
     </select>
 
-    <label>Condensing Temperature (°F)</label>
+    <label for="Capacity">Required Capacity (MBH)</label>
+    <input id="Capacity" type="number" min="1">
+
+    <label for="Refrigerant">Refrigerant</label>
+    <select id="Refrigerant">
+        <option value="R717">R717</option>
+        <option id="r22-option" value="R22">R22</option>
+    </select>
+
+    <label for="Condensing Temperature">Condensing Temperature (°F)</label>
     <input id="Condensing Temperature" type="number">
 
-    <label>Wet Bulb Temperature (°F)</label>
+    <label for="Wet Bulb Temperature">Wet Bulb Temperature (°F)</label>
     <input id="Wet Bulb Temperature" type="number">
 
-    <label>Motor Voltage</label>
+    <label for="Motor Voltage">Motor Voltage</label>
     <select id="Motor Voltage">
         <option value="460/3/60">460/3/60</option>
         <option value="575/3/60">575/3/60</option>
@@ -238,6 +244,7 @@
     </div>
 </div>
 
+<script src="dtc-units.js?v=20261111-1442"></script>
 <script>
 
 const wetBulbTemperatures = [
@@ -252,7 +259,7 @@ const correctionFactorRows = [
     { condensingTemperature: 105, factors: [0.56, 0.59, 0.62, 0.64, 0.67, 0.69, 0.71, 0.74, 0.78, 0.81, 0.83, 0.85, 0.87, 0.89, 0.95, 1.01, 1.1, 1.21] },
     { condensingTemperature: 110, factors: [0.5, 0.53, 0.55, 0.57, 0.58, 0.6, 0.62, 0.63, 0.66, 0.69, 0.7, 0.71, 0.73, 0.75, 0.79, 0.83, 0.87, 0.93] }
 ];
-const units = [
+const iecUnits = [
     { model: "IEC-B-1012-AAB", baseHor: 3875.6, fanMotor: "2 x 3" },
     { model: "IEC-B-1012-NAB", baseHor: 4414.3, fanMotor: "2 x 5" },
     { model: "IEC-B-1012-PAB", baseHor: 4870.3, fanMotor: "2 x 7.5" },
@@ -522,9 +529,13 @@ let sortKey = "capacityPercent";
 let sortDirection = "asc";
 let currentResultDetails;
 let selectedUnitModel = null;
+let activeProductLine = "IEC";
 const quoteUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
+const productLineSelect = document.getElementById("product-line");
+const refrigerantSelect = document.getElementById("Refrigerant");
+const r22Option = document.getElementById("r22-option");
 
-const resultColumns = [
+const iecResultColumns = [
     { key: "model", label: "Model", type: "string" },
     { key: "capacityPercent", label: "Capacity", unit: "%", type: "number" },
     { key: "baseHor", label: "Base HOR", unit: "MBH", type: "number" },
@@ -535,9 +546,28 @@ const resultColumns = [
     { key: "r717ChargeLb", label: "R717 Charge", unit: "lb", type: "number" }
 ];
 
+const dtcResultColumns = [
+    { key: "model", label: "Model", type: "string" },
+    { key: "nominalSize", label: "Nominal Size", type: "string" },
+    { key: "r717Tons", label: "Rated R717 Capacity", unit: "Tons", type: "number" },
+    ...iecResultColumns.slice(1)
+];
+
+function getResultColumns() {
+    return activeProductLine === "DTC" ? dtcResultColumns : iecResultColumns;
+}
+
+function setProductLine(productLine) {
+    activeProductLine = productLine === "DTC" ? "DTC" : "IEC";
+    productLineSelect.value = activeProductLine;
+    r22Option.disabled = activeProductLine === "DTC";
+    if (activeProductLine === "DTC") refrigerantSelect.value = "R717";
+}
+
 function renderMatchingUnits(result) {
     const { minimumCapacity, maximumCapacity, correctionFactor } = currentResultDetails;
-    const column = resultColumns.find(item => item.key === sortKey);
+    const resultColumns = getResultColumns();
+    const column = resultColumns.find(item => item.key === sortKey) ?? resultColumns[0];
     const directionMultiplier = sortDirection === "asc" ? 1 : -1;
     const sortedUnits = [...matchingUnits].sort((a, b) => {
         const aValue = a[sortKey];
@@ -555,7 +585,7 @@ function renderMatchingUnits(result) {
 
     result.innerHTML = `
         <h3>Matching Units</h3>
-        <p>Capacity range: ${minimumCapacity.toLocaleString()}–${maximumCapacity.toLocaleString()} BTUH</p>
+        <p>Capacity range: ${minimumCapacity.toLocaleString()}–${maximumCapacity.toLocaleString()} MBH</p>
         <p>Correction factor: ${correctionFactor.toFixed(3)}</p>
         ${sortedUnits.length
             ? `<table>
@@ -568,7 +598,15 @@ function renderMatchingUnits(result) {
                     return `<th scope="col" aria-sort="${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button type="button" data-sort-key="${item.key}" aria-label="Sort by ${item.label}, ${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "ascending"}">${heading}${indicator}</button></th>`;
                 }).join("")}</tr></thead>
                 <tbody>${sortedUnits.map(unit =>
-                    `<tr data-unit-model="${unit.model}" tabindex="0" aria-selected="${unit.model === selectedUnitModel}"><td>${unit.model}</td><td>${unit.capacityPercent.toFixed(1)}%</td><td>${unit.baseHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.correctedHor.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td><td>${unit.airFlowCfm ?? "N/A"}</td><td>${unit.fanMotor}</td><td>${unit.internalCoilVolume ?? "N/A"}</td><td>${unit.r717ChargeLb ?? "N/A"}</td></tr>`
+                    `<tr data-unit-model="${unit.model}" tabindex="0" aria-selected="${unit.model === selectedUnitModel}">${resultColumns.map(item => {
+                        const value = unit[item.key];
+                        const displayValue = item.key === "capacityPercent"
+                            ? `${value.toFixed(1)}%`
+                            : typeof value === "number"
+                                ? value.toLocaleString(undefined, { maximumFractionDigits: item.key === "baseHor" || item.key === "correctedHor" ? 0 : 1 })
+                                : value ?? "N/A";
+                        return `<td>${displayValue}</td>`;
+                    }).join("")}</tr>`
                 ).join("")}</tbody>
             </table>`
             : "<p>No units match the selected capacity range.</p>"}
@@ -604,6 +642,18 @@ document.getElementById("result").addEventListener("keydown", event => {
     }
 });
 
+productLineSelect.addEventListener("change", () => {
+    setProductLine(productLineSelect.value);
+    selectedUnitModel = null;
+    matchingUnits = [];
+    currentResultDetails = null;
+    sortKey = "capacityPercent";
+    sortDirection = "asc";
+    document.getElementById("add-to-quote").disabled = true;
+    document.getElementById("result").textContent =
+        `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
+});
+
 for (const input of document.querySelectorAll("#Capacity, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
@@ -631,6 +681,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
         const unitRow = unitRows[quoteUnitNumber - 1] || {};
         savedUnits[quoteUnitNumber] = {
             ...selectedUnit,
+            productLine: activeProductLine,
             price: 1,
             optionId: "hdg-internal-service-platform",
             optionQuantity: 1,
@@ -685,14 +736,20 @@ function findUnit() {
     const correctionFactor = getCorrectionFactor(condensingTemperature, wetBulbTemperature);
     const minimumCapacity = capacity * (1 + lowerTolerance / 100);
     const maximumCapacity = capacity * (1 + upperTolerance / 100);
-    matchingUnits = units
+    const availableUnits = activeProductLine === "DTC" ? window.dtcUnits : iecUnits;
+    if (!Array.isArray(availableUnits) || availableUnits.length === 0) {
+        result.textContent = `${activeProductLine} model ratings could not be loaded. Refresh the page and try again.`;
+        return;
+    }
+    matchingUnits = availableUnits
         .map(unit => {
             const correctedHor = unit.baseHor / correctionFactor;
             const correctedCapacity = correctedHor;
             return {
                 ...unit,
-                ...unitSpecifications.get(unit.model),
-                r717ChargeLb: r717Charges.get(unit.model),
+                ...(activeProductLine === "IEC" ? unitSpecifications.get(unit.model) : {}),
+                ...(activeProductLine === "IEC" ? { r717ChargeLb: r717Charges.get(unit.model) } : {}),
+                productLine: activeProductLine,
                 correctedHor,
                 capacityPercent: correctedCapacity / capacity * 100
             };
@@ -714,6 +771,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
         const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
         const savedUnit = savedUnits[quoteUnitNumber];
         if (savedUnit) {
+            setProductLine(savedUnit.productLine);
             document.getElementById("Capacity").value = String(savedUnit.requiredCapacity ?? "");
             document.getElementById("Refrigerant").value = savedUnit.refrigerant ?? "R717";
             document.getElementById("Condensing Temperature").value = String(savedUnit.condensingTemperature ?? "");
@@ -725,7 +783,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
             findUnit();
             if (matchingUnits.some(unit => unit.model === savedUnit.model)) {
                 selectedUnitModel = savedUnit.model;
-                sortKey = resultColumns.some(column => column.key === savedUnit.searchSortKey)
+                sortKey = getResultColumns().some(column => column.key === savedUnit.searchSortKey)
                     ? savedUnit.searchSortKey
                     : "capacityPercent";
                 sortDirection = savedUnit.searchSortDirection === "desc" ? "desc" : "asc";
