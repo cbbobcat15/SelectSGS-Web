@@ -361,12 +361,15 @@
         const lines = [];
         for (const [index, unit] of units.entries()) {
             const basePrice = Number(unit.baseNetPrice) || 0;
+            const cellCount = Number.isSafeInteger(Number(unit.cellCount)) && Number(unit.cellCount) >= 1
+                ? Number(unit.cellCount)
+                : 1;
             lines.push({
                 type: "unit",
-                quantity: 1,
-                description: `Line Item #${unit.unitNumber}: Location: ${unit.location} | Model #: ${unit.model}`,
+                quantity: cellCount,
+                description: `Line Item #${unit.unitNumber}: Location: ${unit.location} | Model #: ${unit.model} | Cells: ${cellCount}`,
                 netEach: basePrice,
-                extended: basePrice
+                extended: basePrice * cellCount
             });
 
             const options = (unit.options ?? []).filter(item => item.optionId);

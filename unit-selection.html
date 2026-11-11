@@ -210,6 +210,9 @@
     <label for="Capacity">Required Capacity (MBH)</label>
     <input id="Capacity" type="number" min="1">
 
+    <label for="max-cells">Max # of Cells</label>
+    <input id="max-cells" type="number" min="1" step="1" value="99">
+
     <label for="Refrigerant">Refrigerant</label>
     <select id="Refrigerant">
         <option value="R717">R717</option>
@@ -526,10 +529,11 @@ function getCorrectionFactor(condensingTemperature, wetBulbTemperature) {
 }
 
 let matchingUnits = [];
-let sortKey = "capacityPercent";
+let sortKey = "listPrice";
 let sortDirection = "asc";
 let currentResultDetails;
 let selectedUnitModel = null;
+let selectedCellCount = null;
 let activeProductLine = "IEC";
 const quoteUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
 const productLineSelect = document.getElementById("product-line");
@@ -538,6 +542,8 @@ const r22Option = document.getElementById("r22-option");
 
 const iecResultColumns = [
     { key: "model", label: "Model", type: "string" },
+    { key: "cellCount", label: "# of Cells", type: "number" },
+    { key: "listPrice", label: "List Price", type: "number" },
     { key: "capacityPercent", label: "Capacity", unit: "%", type: "number" },
     { key: "baseHor", label: "Base HOR", unit: "MBH", type: "number" },
     { key: "correctedHor", label: "Corrected HOR", unit: "MBH", type: "number" },
@@ -563,6 +569,15 @@ function setProductLine(productLine) {
     productLineSelect.value = activeProductLine;
     r22Option.disabled = activeProductLine === "DTC";
     if (activeProductLine === "DTC") refrigerantSelect.value = "R717";
+}
+
+function formatCurrency(value) {
+    return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
 }
 
 function renderMatchingUnits(result) {
@@ -599,9 +614,11 @@ function renderMatchingUnits(result) {
                     return `<th scope="col" aria-sort="${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}"><button type="button" data-sort-key="${item.key}" aria-label="Sort by ${item.label}, ${isSorted ? (sortDirection === "asc" ? "ascending" : "descending") : "ascending"}">${heading}${indicator}</button></th>`;
                 }).join("")}</tr></thead>
                 <tbody>${sortedUnits.map(unit =>
-                    `<tr data-unit-model="${unit.model}" tabindex="0" aria-selected="${unit.model === selectedUnitModel}">${resultColumns.map(item => {
+                    `<tr data-unit-model="${unit.model}" data-cell-count="${unit.cellCount}" tabindex="0" aria-selected="${unit.model === selectedUnitModel && unit.cellCount === selectedCellCount}">${resultColumns.map(item => {
                         const value = unit[item.key];
-                        const displayValue = item.key === "capacityPercent"
+                        const displayValue = item.key === "listPrice"
+                            ? value == null ? "N/A" : formatCurrency(value)
+                            : item.key === "capacityPercent"
                             ? `${value.toFixed(1)}%`
                             : typeof value === "number"
                                 ? value.toLocaleString(undefined, { maximumFractionDigits: item.key === "baseHor" || item.key === "correctedHor" ? 0 : 1 })
@@ -610,10 +627,10 @@ function renderMatchingUnits(result) {
                     }).join("")}</tr>`
                 ).join("")}</tbody>
             </table>`
-            : "<p>No units match the selected capacity range.</p>"}
+            : "<p>No cell configurations match the selected capacity range.</p>"}
     `;
     document.getElementById("add-to-quote").disabled =
-        !selectedUnitModel || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        !selectedUnitModel || !selectedCellCount || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8;
 }
 
 document.getElementById("result").addEventListener("click", event => {
@@ -632,46 +649,51 @@ document.getElementById("result").addEventListener("click", event => {
     }
 
     const row = event.target.closest("tbody tr[data-unit-model]");
-    if (row) selectMatchingUnit(row.dataset.unitModel);
+    if (row) selectMatchingUnit(row.dataset.unitModel, Number(row.dataset.cellCount));
 });
 
 document.getElementById("result").addEventListener("keydown", event => {
     if ((event.key === "Enter" || event.key === " ") &&
         event.target.matches("tbody tr[data-unit-model]")) {
         event.preventDefault();
-        selectMatchingUnit(event.target.dataset.unitModel);
+        selectMatchingUnit(event.target.dataset.unitModel, Number(event.target.dataset.cellCount));
     }
 });
 
 productLineSelect.addEventListener("change", () => {
     setProductLine(productLineSelect.value);
     selectedUnitModel = null;
+    selectedCellCount = null;
     matchingUnits = [];
     currentResultDetails = null;
-    sortKey = "capacityPercent";
+    sortKey = "listPrice";
     sortDirection = "asc";
     document.getElementById("add-to-quote").disabled = true;
     document.getElementById("result").textContent =
         `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (!selectedUnitModel) return;
             selectedUnitModel = null;
+            selectedCellCount = null;
             if (currentResultDetails) renderMatchingUnits(document.getElementById("result"));
         });
     }
 }
 
-function selectMatchingUnit(model) {
+function selectMatchingUnit(model, cellCount) {
     selectedUnitModel = model;
+    selectedCellCount = cellCount;
     renderMatchingUnits(document.getElementById("result"));
 }
 
 document.getElementById("add-to-quote").addEventListener("click", () => {
-    const selectedUnit = matchingUnits.find(unit => unit.model === selectedUnitModel);
+    const selectedUnit = matchingUnits.find(unit =>
+        unit.model === selectedUnitModel && unit.cellCount === selectedCellCount
+    );
     if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
         return;
     }
@@ -693,6 +715,8 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
             ...selectedUnit,
             productLine: activeProductLine,
             price: pricing.basePrice,
+            cellCount: selectedUnit.cellCount,
+            maxCellCount: Number(document.getElementById("max-cells").value),
             refrigerant: document.getElementById("Refrigerant").value,
             motorVoltage: document.getElementById("Motor Voltage").value,
             requiredCapacity: Number(document.getElementById("Capacity").value),
@@ -720,8 +744,10 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
 function findUnit() {
 
     selectedUnitModel = null;
+    selectedCellCount = null;
     document.getElementById("add-to-quote").disabled = true;
     const capacity = Number(document.getElementById("Capacity").value);
+    const maxCellCount = Number(document.getElementById("max-cells").value);
     const condensingTemperatureInput = document.getElementById("Condensing Temperature").value;
     const wetBulbTemperatureInput = document.getElementById("Wet Bulb Temperature").value;
     const condensingTemperature = Number(condensingTemperatureInput);
@@ -731,13 +757,14 @@ function findUnit() {
     const result = document.getElementById("result");
 
     if (!Number.isFinite(capacity) || capacity <= 0 ||
+        !Number.isSafeInteger(maxCellCount) || maxCellCount < 1 ||
         condensingTemperatureInput.trim() === "" || !Number.isFinite(condensingTemperature) ||
         wetBulbTemperatureInput.trim() === "" || !Number.isFinite(wetBulbTemperature) ||
         !Number.isFinite(lowerTolerance) || !Number.isFinite(upperTolerance) ||
         lowerTolerance < -100 || lowerTolerance > 0 ||
         upperTolerance < 0 || lowerTolerance > upperTolerance) {
         result.textContent =
-            "Enter a capacity greater than zero, valid CT and WB values, a lower tolerance from -100% to 0%, and a nonnegative upper tolerance.";
+            "Enter a capacity greater than zero, a maximum cell count of at least 1, valid CT and WB values, a lower tolerance from -100% to 0%, and a nonnegative upper tolerance.";
         return;
     }
 
@@ -749,26 +776,46 @@ function findUnit() {
         result.textContent = `${activeProductLine} model ratings could not be loaded. Refresh the page and try again.`;
         return;
     }
-    matchingUnits = availableUnits
-        .map(unit => {
-            const correctedHor = unit.baseHor / correctionFactor;
-            const correctedCapacity = correctedHor;
-            return {
-                ...unit,
-                ...(activeProductLine === "IEC" ? unitSpecifications.get(unit.model) : {}),
-                ...(activeProductLine === "IEC" ? { r717ChargeLb: r717Charges.get(unit.model) } : {}),
-                productLine: activeProductLine,
+    const pricingModels = window.selectSgsProductPricing?.models ?? {};
+    matchingUnits = availableUnits.flatMap(unit => {
+        const perCellCorrectedHor = unit.baseHor / correctionFactor;
+        const firstCellCount = Math.max(1, Math.ceil(minimumCapacity / perCellCorrectedHor));
+        const lastCellCount = Math.min(maxCellCount, Math.floor(maximumCapacity / perCellCorrectedHor));
+        const model = {
+            ...unit,
+            ...(activeProductLine === "IEC" ? unitSpecifications.get(unit.model) : {}),
+            ...(activeProductLine === "IEC" ? { r717ChargeLb: r717Charges.get(unit.model) } : {}),
+            productLine: activeProductLine
+        };
+        const solutions = [];
+        for (let cellCount = firstCellCount; cellCount <= lastCellCount;) {
+            const correctedHor = perCellCorrectedHor * cellCount;
+            solutions.push({
+                ...model,
+                cellCount,
+                baseHor: unit.baseHor * cellCount,
                 correctedHor,
-                capacityPercent: correctedCapacity / capacity * 100
-            };
-        })
-        .filter(unit =>
-            unit.correctedHor >= minimumCapacity &&
-            unit.correctedHor <= maximumCapacity
-        );
+                capacityPercent: correctedHor / capacity * 100,
+                listPrice: Number.isFinite(pricingModels[unit.model]?.basePrice)
+                    ? pricingModels[unit.model].basePrice * cellCount
+                    : null,
+                ...(model.r717Tons === undefined ? {} : { r717Tons: model.r717Tons * cellCount }),
+                ...(model.airFlowCfm === undefined ? {} : { airFlowCfm: model.airFlowCfm * cellCount }),
+                ...(model.internalCoilVolume === undefined ? {} : { internalCoilVolume: model.internalCoilVolume * cellCount }),
+                ...(model.r717ChargeLb === undefined ? {} : { r717ChargeLb: model.r717ChargeLb * cellCount })
+            });
+            if (cellCount === lastCellCount) break;
+            cellCount++;
+        }
+        return solutions;
+    }).filter(unit =>
+        unit.correctedHor >= minimumCapacity &&
+        unit.correctedHor <= maximumCapacity
+    );
 
     selectedUnitModel = null;
-    sortKey = "capacityPercent";
+    selectedCellCount = null;
+    sortKey = "listPrice";
     sortDirection = "asc";
     currentResultDetails = { minimumCapacity, maximumCapacity, correctionFactor };
     renderMatchingUnits(result);
@@ -787,13 +834,16 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
             document.getElementById("Motor Voltage").value = savedUnit.motorVoltage ?? "460/3/60";
             document.getElementById("Lower Tolerance").value = String(savedUnit.lowerTolerance ?? -10);
             document.getElementById("Upper Tolerance").value = String(savedUnit.upperTolerance ?? 10);
+            document.getElementById("max-cells").value = String(savedUnit.maxCellCount ?? 99);
 
             findUnit();
-            if (matchingUnits.some(unit => unit.model === savedUnit.model)) {
+            const savedCellCount = Number(savedUnit.cellCount ?? 1);
+            if (matchingUnits.some(unit => unit.model === savedUnit.model && unit.cellCount === savedCellCount)) {
                 selectedUnitModel = savedUnit.model;
+                selectedCellCount = savedCellCount;
                 sortKey = getResultColumns().some(column => column.key === savedUnit.searchSortKey)
                     ? savedUnit.searchSortKey
-                    : "capacityPercent";
+                    : "listPrice";
                 sortDirection = savedUnit.searchSortDirection === "desc" ? "desc" : "asc";
                 renderMatchingUnits(document.getElementById("result"));
             }

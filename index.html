@@ -888,6 +888,7 @@ function renderUnitDetails(unitNumber) {
 
     const primaryFields = [
         ["Product line", unit.productLine ?? "IEC"],
+        ["# of cells", getUnitCellCount(unit)],
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
         ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
         ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
@@ -975,7 +976,7 @@ function copySelectedLineItem() {
 
     destinationRow.querySelector('[data-unit-field="location"]').value = copy.location;
     destinationRow.querySelector('[data-unit-field="tag"]').value = copy.tag;
-    destinationRow.querySelector(".select-unit").textContent = "Change Unit";
+    destinationRow.querySelector(".select-unit").textContent = getUnitSelectionLabel(copy);
 
     if (!saveQuotedUnits()) return;
     selectLineItem(destinationNumber);
@@ -1011,7 +1012,7 @@ function deleteSelectedLineItem() {
         quotedUnits[unitNumber] = item.unit;
         row.querySelector('[data-unit-field="location"]').value = item.location;
         row.querySelector('[data-unit-field="tag"]').value = item.tag;
-        row.querySelector(".select-unit").textContent = "Change Unit";
+        row.querySelector(".select-unit").textContent = getUnitSelectionLabel(item.unit);
     });
 
     const nextSelection = Math.min(activeUnitNumber, remainingUnits.length);
@@ -1035,12 +1036,26 @@ function getUnitLinePrice(unit) {
     if (isPricedProductLine(unit) && !productPricing) return null;
 
     const basePrice = productPricing?.basePrice ?? (Number(unit.price) || 0);
+    const cellCount = getUnitCellCount(unit);
     const optionNet = getUnitOptions(unit).reduce((sum, option) => {
         if (!option.optionId) return sum;
-        const price = getOptionPricing(unit, option.optionId)?.price;
-        return price === undefined ? sum : sum + option.quantity * price * costMultiplier;
+        const pricing = getOptionPricing(unit, option.optionId);
+        if (!pricing) return sum;
+        const optionCount = option.quantity * (pricing.uom === "per Cell" ? cellCount : 1);
+        return sum + optionCount * pricing.price * costMultiplier;
     }, 0);
-    return basePrice * costMultiplier + optionNet;
+    return basePrice * cellCount * costMultiplier + optionNet;
+}
+
+function getUnitCellCount(unit) {
+    return Number.isSafeInteger(Number(unit.cellCount)) && Number(unit.cellCount) >= 1
+        ? Number(unit.cellCount)
+        : 1;
+}
+
+function getUnitSelectionLabel(unit) {
+    const cellCount = getUnitCellCount(unit);
+    return `Change Unit (${cellCount} ${cellCount === 1 ? "cell" : "cells"})`;
 }
 
 function isPricedProductLine(unit) {
@@ -1166,8 +1181,9 @@ function updateQuotePrices() {
         const optionPricing = option.optionId ? getOptionPricing(activeUnit, option.optionId) : null;
         const optionPrice = optionPricing?.price ?? 0;
         if (uom) uom.textContent = optionPricing?.uom ?? "—";
-        listPrice.textContent = formatCurrency(optionPrice);
-        netPrice.textContent = formatCurrency(optionPrice * option.quantity * costMultiplier);
+        const optionCount = option.quantity * (optionPricing?.uom === "per Cell" ? getUnitCellCount(activeUnit) : 1);
+        listPrice.textContent = formatCurrency(optionPrice * optionCount);
+        netPrice.textContent = formatCurrency(optionPrice * optionCount * costMultiplier);
     }
 }
 
@@ -1186,6 +1202,7 @@ exportQuoteButton.addEventListener("click", async () => {
                 location: row.querySelector('[data-unit-field="location"]').value,
                 tag: row.querySelector('[data-unit-field="tag"]').value,
                 baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
+                cellCount: getUnitCellCount(unit),
                 options: getUnitOptions(unit)
                     .filter(option => option.optionId)
                     .map(option => {
@@ -1195,6 +1212,7 @@ exportQuoteButton.addEventListener("click", async () => {
                         }
                         return {
                             ...option,
+                            quantity: option.quantity * (optionPricing.uom === "per Cell" ? getUnitCellCount(unit) : 1),
                             optionId: optionPricing.label,
                             netEachPrice: optionPricing.price * costMultiplier
                         };
@@ -1602,7 +1620,7 @@ for (const row of unitRows) {
     const quotedUnit = quotedUnits[unitNumber];
     row.setAttribute("aria-selected", "false");
     if (quotedUnit) {
-        row.querySelector(".select-unit").textContent = "Change Unit";
+        row.querySelector(".select-unit").textContent = getUnitSelectionLabel(quotedUnit);
     }
 
     row.addEventListener("click", event => {
