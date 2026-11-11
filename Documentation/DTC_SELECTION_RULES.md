@@ -17,7 +17,7 @@
 3. Each DTC model's corrected heat rejection per cell is its engineering-data Base HOR divided by the correction factor.
 4. The system lists each model and cell count up to the maximum whose combined corrected heat rejection falls within the requested capacity tolerance.
 5. Results are sorted by combined list price, lowest to highest, by default.
-6. Results can also be sorted by model, nominal size, number of cells, rated R717 tons, capacity match, list price, Base HOR, corrected HOR, airflow, fan motor power, internal coil volume, or R717 charge.
+6. Results can also be sorted by model, nominal size, number of cells, rated R717 tons, capacity match, list price, Base HOR, corrected HOR, airflow, fan motor power, internal coil volume, R717 charge, shipping weight, heaviest section weight, or operating weight. Shipping and operating weights and rated capacity are totals across the selected cells; heaviest section weight is the weight of the largest individual section.
 
 ## Data Source
 

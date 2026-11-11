@@ -248,6 +248,7 @@
 </div>
 
 <script src="dtc-units.js?v=20261111-1442"></script>
+<script src="iec-engineering-data.js?v=20261111-2008"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
 <script>
 
@@ -542,6 +543,8 @@ const r22Option = document.getElementById("r22-option");
 
 const iecResultColumns = [
     { key: "model", label: "Model", type: "string" },
+    { key: "nominalSize", label: "Nominal Box Size", type: "string" },
+    { key: "r717Tons", label: "Rated R717 Capacity", unit: "Tons", type: "number" },
     { key: "cellCount", label: "# of Cells", type: "number" },
     { key: "listPrice", label: "List Price", type: "number" },
     { key: "capacityPercent", label: "Capacity", unit: "%", type: "number" },
@@ -550,18 +553,14 @@ const iecResultColumns = [
     { key: "airFlowCfm", label: "Air Flow", unit: "CFM", type: "number" },
     { key: "fanMotor", label: "Fan Motor", unit: "HP", type: "string" },
     { key: "internalCoilVolume", label: "Internal Coil Volume", unit: "ft^3", type: "number" },
-    { key: "r717ChargeLb", label: "R717 Charge", unit: "lb", type: "number" }
-];
-
-const dtcResultColumns = [
-    { key: "model", label: "Model", type: "string" },
-    { key: "nominalSize", label: "Nominal Size", type: "string" },
-    { key: "r717Tons", label: "Rated R717 Capacity", unit: "Tons", type: "number" },
-    ...iecResultColumns.slice(1)
+    { key: "r717ChargeLb", label: "R717 Charge", unit: "lb", type: "number" },
+    { key: "shippingWeightLb", label: "Shipping Weight", unit: "lb", type: "number" },
+    { key: "heaviestSectionWeightLb", label: "Heaviest Section Weight", unit: "lb", type: "number" },
+    { key: "operatingWeightLb", label: "Operating Weight", unit: "lb", type: "number" }
 ];
 
 function getResultColumns() {
-    return activeProductLine === "DTC" ? dtcResultColumns : iecResultColumns;
+    return iecResultColumns;
 }
 
 function setProductLine(productLine) {
@@ -785,6 +784,7 @@ function findUnit() {
             ...unit,
             ...(activeProductLine === "IEC" ? unitSpecifications.get(unit.model) : {}),
             ...(activeProductLine === "IEC" ? { r717ChargeLb: r717Charges.get(unit.model) } : {}),
+            ...(activeProductLine === "IEC" ? window.iecEngineeringDetails?.[unit.model] : {}),
             productLine: activeProductLine
         };
         const solutions = [];
@@ -802,7 +802,9 @@ function findUnit() {
                 ...(model.r717Tons === undefined ? {} : { r717Tons: model.r717Tons * cellCount }),
                 ...(model.airFlowCfm === undefined ? {} : { airFlowCfm: model.airFlowCfm * cellCount }),
                 ...(model.internalCoilVolume === undefined ? {} : { internalCoilVolume: model.internalCoilVolume * cellCount }),
-                ...(model.r717ChargeLb === undefined ? {} : { r717ChargeLb: model.r717ChargeLb * cellCount })
+                ...(model.r717ChargeLb === undefined ? {} : { r717ChargeLb: model.r717ChargeLb * cellCount }),
+                ...(model.shippingWeightLb === undefined ? {} : { shippingWeightLb: model.shippingWeightLb * cellCount }),
+                ...(model.operatingWeightLb === undefined ? {} : { operatingWeightLb: model.operatingWeightLb * cellCount })
             });
             if (cellCount === lastCellCount) break;
             cellCount++;

@@ -900,6 +900,8 @@ function renderUnitDetails(unitNumber) {
         ["Wet bulb temperature", `${unit.wetBulbTemperature} °F`]
     ];
     const secondaryFields = [
+        ["Nominal box size", unit.nominalSize],
+        ["Rated R717 capacity", `${unit.r717Tons?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? "N/A"} Tons`],
         ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
         ["Corrected HOR", `${unit.correctedHor.toLocaleString()} MBH`],
         ["Motor voltage", unit.motorVoltage],
@@ -907,10 +909,9 @@ function renderUnitDetails(unitNumber) {
         ["Air flow", `${unit.airFlowCfm?.toLocaleString() ?? "N/A"} CFM`],
         ["Internal coil volume", `${unit.internalCoilVolume ?? "N/A"} ft³`],
         ["R717 charge", `${unit.r717ChargeLb ?? "N/A"} lb`],
-        ...(unit.productLine === "DTC" ? [
-            ["Nominal size", unit.nominalSize],
-            ["Rated R717 capacity", `${unit.r717Tons} Tons`]
-        ] : [])
+        ["Shipping weight", `${unit.shippingWeightLb?.toLocaleString() ?? "N/A"} lb`],
+        ["Heaviest section weight", `${unit.heaviestSectionWeightLb?.toLocaleString() ?? "N/A"} lb`],
+        ["Operating weight", `${unit.operatingWeightLb?.toLocaleString() ?? "N/A"} lb`]
     ];
 
     const model = document.createElement("div");

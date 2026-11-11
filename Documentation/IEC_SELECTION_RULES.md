@@ -18,4 +18,6 @@
 
 **Outputs**
 
-Results include model number, number of cells, total list price, capacity match, combined base and corrected HOR, airflow, fan motor, internal coil volume, and R717 charge.
+Results include model number, nominal box size, number of cells, total list price, rated R717 capacity, capacity match, combined base and corrected HOR, airflow, fan motor, internal coil volume, R717 charge, shipping weight, heaviest section weight, and design operating weight. Shipping and operating weights and rated capacity are totals across the selected cells; heaviest section weight is the weight of the largest individual section.
+
+IEC model ratings, nominal box sizes, and weights are bundled in `iec-engineering-data.js`, based on the IEC tab of the engineering ratings workbook.
