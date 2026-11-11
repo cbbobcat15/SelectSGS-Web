@@ -830,7 +830,12 @@ let activeProjectId = null;
 let projectTreeProjects = [];
 
 function formatCurrency(value) {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(value);
+    return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
 }
 
 function renderUnitDetails(unitNumber) {
@@ -1546,7 +1551,7 @@ optionRows.addEventListener("change", event => {
             renderOptionRows(options, quotedUnits[activeUnitNumber]);
             optionRows.querySelector(`[data-option-select="${Math.min(index, selectedOptions.length)}"]`)?.focus();
         } else {
-            options[index].optionId = select.value === hdgOptionId ? hdgOptionId : "";
+            options[index].optionId = select.value;
         }
         saveQuotedUnits();
         updateQuotePrices();
