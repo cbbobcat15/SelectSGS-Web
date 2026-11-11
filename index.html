@@ -892,8 +892,8 @@ function renderUnitDetails(unitNumber) {
     const primaryFields = [
         ["Product line", unit.productLine ?? "IEC"],
         ["# of cells", getUnitCellCount(unit)],
-        ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
-        ["Corrected HOR", `${unit.correctedHor.toLocaleString()} MBH`],
+        ["Base HOR", `${unit.baseHor.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MBH`],
+        ["Corrected HOR", `${unit.correctedHor.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MBH`],
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
         ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
         ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
