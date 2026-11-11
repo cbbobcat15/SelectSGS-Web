@@ -10,15 +10,19 @@
 
     const spreadsheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    function parseWorksheet(xml) {
+    function parseXml(xml, errorMessage) {
         const document = new DOMParser().parseFromString(xml, "application/xml");
         if (document.getElementsByTagName("parsererror").length) {
-            throw new Error("The quote template contains invalid worksheet XML.");
+            throw new Error(errorMessage);
         }
         return document;
     }
 
-    function serializeWorksheet(document) {
+    function parseWorksheet(xml) {
+        return parseXml(xml, "The quote template contains invalid worksheet XML.");
+    }
+
+    function serializeXml(document) {
         return new XMLSerializer().serializeToString(document);
     }
 
@@ -235,7 +239,7 @@
         for (const line of lines) total += line.extended;
         const finalSheetData = getSheetData(sheet);
         setCellValue(finalSheetData, totalRow, `K${totalRow}`, total);
-        return serializeWorksheet(sheet);
+        return serializeXml(sheet);
     }
 
     function cloneItemPage(sheet, offset) {
@@ -409,6 +413,52 @@
         return new TextDecoder().decode(bytes);
     }
 
+    function replaceZipEntryText(entry, content) {
+        const bytes = encoder.encode(content);
+        entry.method = 0;
+        entry.flags = 0;
+        entry.crc = crc32(bytes);
+        entry.compressed = bytes;
+        entry.uncompressedSize = bytes.length;
+    }
+
+    async function removeCalcChain(files) {
+        const chainIndex = files.findIndex(file => file.name === "xl/calcChain.xml");
+        if (chainIndex < 0) return;
+
+        const relationships = files.find(file => file.name === "xl/_rels/workbook.xml.rels");
+        const contentTypes = files.find(file => file.name === "[Content_Types].xml");
+        if (!relationships || !contentTypes) {
+            throw new Error("The quote template calculation chain references are missing.");
+        }
+
+        const relationshipNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
+        const relationshipDocument = parseXml(
+            await readZipEntryText(relationships),
+            "The quote template contains invalid workbook relationship XML."
+        );
+        for (const relationship of Array.from(relationshipDocument.getElementsByTagNameNS(relationshipNamespace, "Relationship"))) {
+            if (relationship.getAttribute("Type").endsWith("/calcChain")) {
+                relationship.parentNode.removeChild(relationship);
+            }
+        }
+
+        const contentTypeNamespace = "http://schemas.openxmlformats.org/package/2006/content-types";
+        const contentTypeDocument = parseXml(
+            await readZipEntryText(contentTypes),
+            "The quote template contains invalid content type XML."
+        );
+        for (const override of Array.from(contentTypeDocument.getElementsByTagNameNS(contentTypeNamespace, "Override"))) {
+            if (override.getAttribute("PartName") === "/xl/calcChain.xml") {
+                override.parentNode.removeChild(override);
+            }
+        }
+
+        files.splice(chainIndex, 1);
+        replaceZipEntryText(relationships, serializeXml(relationshipDocument));
+        replaceZipEntryText(contentTypes, serializeXml(contentTypeDocument));
+    }
+
     function zipFiles(files) {
         const localParts = [];
         const centralParts = [];
@@ -480,12 +530,13 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261111-1328");
+        templateUrl.searchParams.set("v", "20261111-1343");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
         }
         const files = readZipEntries(await templateResponse.arrayBuffer());
+        await removeCalcChain(files);
         const quoteSheet = files.find(file => file.name === "xl/worksheets/sheet1.xml");
         const itemSheet = files.find(file => file.name === "xl/worksheets/sheet2.xml");
         if (!quoteSheet || !itemSheet) {
@@ -495,12 +546,7 @@
             [quoteSheet, makeQuoteSheet(await readZipEntryText(quoteSheet), project, units, exportDate)],
             [itemSheet, makeItemEcSheet(await readZipEntryText(itemSheet), project, units)]
         ]) {
-            const bytes = encoder.encode(content);
-            file.method = 0;
-            file.flags = 0;
-            file.crc = crc32(bytes);
-            file.compressed = bytes;
-            file.uncompressedSize = bytes.length;
+            replaceZipEntryText(file, content);
         }
         const blob = zipFiles(files);
         const anchor = document.createElement("a");
