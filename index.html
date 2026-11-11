@@ -768,6 +768,7 @@
                 </table>
             </div>
             <p id="quote-total" class="quote-total"></p>
+            <p id="quote-pricing-error" class="price-note" role="alert" hidden></p>
         </section>
 
         <section id="options-panel" class="options-panel" aria-labelledby="options-heading" hidden>
@@ -786,13 +787,13 @@
                     <tbody id="option-rows"></tbody>
                 </table>
             </div>
-            <p class="price-note">HDG Internal Service Platform list price is a temporary $0.00 placeholder.</p>
             <p id="multiplier-error" role="alert" hidden></p>
         </section>
     </div>
 </main>
 </div>
-<script src="quote-export.js?v=20261111-1516"></script>
+<script src="product-pricing.js?v=20261111-1540"></script>
+<script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
 const projectFields = [...projectForm.elements].filter(element => element.name);
@@ -814,10 +815,10 @@ const exportQuoteButton = document.getElementById("export-quote");
 const optionsPanel = document.getElementById("options-panel");
 const multiplierInput = document.getElementById("cost-multiplier");
 const optionRows = document.getElementById("option-rows");
-const accessoryListPrice = 0;
 const optionLineCount = 12;
-const hdgOptionId = "hdg-internal-service-platform";
-const hdgOptionLabel = "HDG Internal Service Platform";
+const hdgOptionId = "Internal_HDG_Plt";
+const legacyHdgOptionId = "hdg-internal-service-platform";
+const productPrices = window.selectSgsProductPricing?.models ?? {};
 const deselectOptionValue = "__deselect__";
 let quotedUnits = {};
 const requestedUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
@@ -848,7 +849,7 @@ function renderUnitDetails(unitNumber) {
     }
 
     const options = getUnitOptions(unit);
-    renderOptionRows(options);
+    renderOptionRows(options, unit);
     optionsPanel.hidden = false;
 
     const primaryFields = [
@@ -904,23 +905,50 @@ function renderUnitDetails(unitNumber) {
 }
 
 function getUnitLinePrice(unit) {
-    const optionNet = getUnitOptions(unit).reduce((sum, option) =>
-        sum + (option.optionId ? option.quantity * accessoryListPrice * costMultiplier : 0), 0);
-    return (Number(unit.price) || 0) * costMultiplier + optionNet;
+    const productPricing = getProductPricing(unit);
+    if (isPricedProductLine(unit) && !productPricing) return null;
+
+    const basePrice = productPricing?.basePrice ?? (Number(unit.price) || 0);
+    const optionNet = getUnitOptions(unit).reduce((sum, option) => {
+        if (!option.optionId) return sum;
+        const price = getOptionPricing(unit, option.optionId)?.price;
+        return price === undefined ? sum : sum + option.quantity * price * costMultiplier;
+    }, 0);
+    return basePrice * costMultiplier + optionNet;
+}
+
+function isPricedProductLine(unit) {
+    return unit.productLine === "IEC" || unit.productLine === "DTC" ||
+        typeof unit.model === "string" && /^(IEC|DTC)-/.test(unit.model);
+}
+
+function getProductPricing(unit) {
+    return isPricedProductLine(unit) ? productPrices[unit.model] ?? null : null;
+}
+
+function getProductOptions(unit) {
+    return getProductPricing(unit)?.options ?? [];
+}
+
+function getOptionPricing(unit, optionId) {
+    return getProductOptions(unit).find(option => option.id === optionId) ?? null;
 }
 
 function getUnitOptions(unit) {
+    const availableOptions = getProductOptions(unit);
+    const availableOptionIds = new Set(availableOptions.map(option => option.id));
     if (!Array.isArray(unit.options)) {
         unit.options = Array.from({ length: optionLineCount }, (_, index) => ({
-            optionId: index === 0 ? (unit.optionId ?? hdgOptionId) : "",
-            quantity: index === 0 ? (unit.optionQuantity ?? 1) : 1
+            optionId: "",
+            quantity: 1
         }));
     }
 
     unit.options = Array.from({ length: optionLineCount }, (_, index) => {
         const option = unit.options[index];
+        const optionId = option?.optionId === legacyHdgOptionId ? hdgOptionId : option?.optionId;
         return {
-            optionId: option?.optionId === hdgOptionId ? hdgOptionId : "",
+            optionId: availableOptionIds.has(optionId) ? optionId : "",
             quantity: Number.isInteger(Number(option?.quantity)) && Number(option.quantity) >= 1
                 ? Number(option.quantity)
                 : 1
@@ -930,7 +958,7 @@ function getUnitOptions(unit) {
     return unit.options;
 }
 
-function renderOptionRows(options) {
+function renderOptionRows(options, unit) {
     optionRows.replaceChildren();
     options.forEach((option, index) => {
         const row = document.createElement("tr");
@@ -938,14 +966,20 @@ function renderOptionRows(options) {
             <td><select data-option-select="${index}" aria-label="Selectable option ${index + 1}">
                 <option value="">Select an option</option>
                 <option value="${deselectOptionValue}">Deselect option</option>
-                <option value="${hdgOptionId}">${hdgOptionLabel}</option>
             </select></td>
             <td><input data-option-quantity="${index}" type="number" min="1" step="1" value="${option.quantity}" aria-label="Option ${index + 1} quantity"></td>
-            <td>per Unit</td>
-            <td data-option-list-price="${index}" class="option-price">${formatCurrency(accessoryListPrice)}</td>
+            <td data-option-uom="${index}"></td>
+            <td data-option-list-price="${index}" class="option-price"></td>
             <td data-option-net-price="${index}" class="option-price">${formatCurrency(0)}</td>
         `;
-        row.querySelector(`[data-option-select="${index}"]`).value = option.optionId;
+        const select = row.querySelector(`[data-option-select="${index}"]`);
+        for (const productOption of getProductOptions(unit)) {
+            const optionElement = document.createElement("option");
+            optionElement.value = productOption.id;
+            optionElement.textContent = productOption.label;
+            select.append(optionElement);
+        }
+        select.value = option.optionId;
         optionRows.append(row);
     });
 }
@@ -965,29 +999,45 @@ function saveQuotedUnits() {
 
 function updateQuotePrices() {
     let total = 0;
+    const unavailableModels = [];
     for (const row of unitRows) {
         const unitNumber = row.dataset.unitRow;
         const unit = quotedUnits[unitNumber];
         if (!unit) continue;
 
         const linePrice = getUnitLinePrice(unit);
+        if (linePrice === null) {
+            unavailableModels.push(unit.model);
+            row.querySelector("[data-unit-price]").textContent = "Unavailable";
+            continue;
+        }
         row.querySelector("[data-unit-price]").textContent = formatCurrency(linePrice);
         total += linePrice;
     }
 
-    exportQuoteButton.disabled = !unitRows.some(row => quotedUnits[row.dataset.unitRow]);
-    document.getElementById("quote-total").textContent = `Total Cost: ${formatCurrency(total)}`;
+    exportQuoteButton.disabled = !unitRows.some(row => quotedUnits[row.dataset.unitRow]) ||
+        unavailableModels.length > 0;
+    document.getElementById("quote-total").textContent = unavailableModels.length
+        ? "Total Cost: unavailable"
+        : `Total Cost: ${formatCurrency(total)}`;
+    const pricingError = document.getElementById("quote-pricing-error");
+    pricingError.textContent = unavailableModels.length
+        ? `Pricing is unavailable for: ${unavailableModels.join(", ")}. Re-select those units or refresh the pricing data.`
+        : "";
+    pricingError.hidden = unavailableModels.length === 0;
     const activeUnit = Number.isInteger(activeUnitNumber) ? quotedUnits[activeUnitNumber] : null;
     if (!activeUnit) return;
 
     for (const [index, option] of getUnitOptions(activeUnit).entries()) {
         const listPrice = document.querySelector(`[data-option-list-price="${index}"]`);
         const netPrice = document.querySelector(`[data-option-net-price="${index}"]`);
+        const uom = document.querySelector(`[data-option-uom="${index}"]`);
         if (!listPrice || !netPrice) continue;
-        listPrice.textContent = formatCurrency(accessoryListPrice);
-        netPrice.textContent = formatCurrency(
-            option.optionId ? accessoryListPrice * option.quantity * costMultiplier : 0
-        );
+        const optionPricing = option.optionId ? getOptionPricing(activeUnit, option.optionId) : null;
+        const optionPrice = optionPricing?.price ?? 0;
+        if (uom) uom.textContent = optionPricing?.uom ?? "—";
+        listPrice.textContent = formatCurrency(optionPrice);
+        netPrice.textContent = formatCurrency(optionPrice * option.quantity * costMultiplier);
     }
 }
 
@@ -996,18 +1046,29 @@ exportQuoteButton.addEventListener("click", async () => {
         const units = unitRows.flatMap(row => {
             const unit = quotedUnits[row.dataset.unitRow];
             if (!unit) return [];
+            const productPricing = getProductPricing(unit);
+            if (isPricedProductLine(unit) && !productPricing) {
+                throw new Error(`Pricing is unavailable for model ${unit.model}.`);
+            }
             return [{
                 ...unit,
                 unitNumber: Number(row.dataset.unitRow),
                 location: row.querySelector('[data-unit-field="location"]').value,
                 tag: row.querySelector('[data-unit-field="tag"]').value,
-                baseNetPrice: (Number(unit.price) || 0) * costMultiplier,
+                baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
                 options: getUnitOptions(unit)
                     .filter(option => option.optionId)
-                    .map(option => ({
-                        ...option,
-                        netEachPrice: accessoryListPrice * costMultiplier
-                    }))
+                    .map(option => {
+                        const optionPricing = getOptionPricing(unit, option.optionId);
+                        if (!optionPricing) {
+                            throw new Error(`Pricing is unavailable for option ${option.optionId} on model ${unit.model}.`);
+                        }
+                        return {
+                            ...option,
+                            optionId: optionPricing.label,
+                            netEachPrice: optionPricing.price * costMultiplier
+                        };
+                    })
             }];
         });
         await window.exportQuoteWorkbook({
@@ -1482,7 +1543,7 @@ optionRows.addEventListener("change", event => {
                     quantity: 1
                 }))
             );
-            renderOptionRows(options);
+            renderOptionRows(options, quotedUnits[activeUnitNumber]);
             optionRows.querySelector(`[data-option-select="${Math.min(index, selectedOptions.length)}"]`)?.focus();
         } else {
             options[index].optionId = select.value === hdgOptionId ? hdgOptionId : "";

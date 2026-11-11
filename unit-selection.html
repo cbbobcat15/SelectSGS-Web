@@ -245,6 +245,7 @@
 </div>
 
 <script src="dtc-units.js?v=20261111-1442"></script>
+<script src="product-pricing.js?v=20261111-1525"></script>
 <script>
 
 const wetBulbTemperatures = [
@@ -676,15 +677,22 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
     }
 
     try {
+        const pricing = window.selectSgsProductPricing?.models?.[selectedUnit.model];
+        if (!pricing || !Number.isFinite(pricing.basePrice)) {
+            const result = document.getElementById("result");
+            const message = document.createElement("p");
+            message.setAttribute("role", "alert");
+            message.textContent = `Pricing is unavailable for model ${selectedUnit.model}. Refresh the page or contact support.`;
+            result.prepend(message);
+            return;
+        }
         const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
         const unitRows = JSON.parse(sessionStorage.getItem("selectsgs-unit-rows") || "[]");
         const unitRow = unitRows[quoteUnitNumber - 1] || {};
         savedUnits[quoteUnitNumber] = {
             ...selectedUnit,
             productLine: activeProductLine,
-            price: 1,
-            optionId: "hdg-internal-service-platform",
-            optionQuantity: 1,
+            price: pricing.basePrice,
             refrigerant: document.getElementById("Refrigerant").value,
             motorVoltage: document.getElementById("Motor Voltage").value,
             requiredCapacity: Number(document.getElementById("Capacity").value),
