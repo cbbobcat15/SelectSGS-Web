@@ -819,6 +819,7 @@
 </main>
 </div>
 <script src="product-pricing.js?v=20261111-1540"></script>
+<script src="iec-engineering-data.js?v=20261111-2016"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -891,6 +892,8 @@ function renderUnitDetails(unitNumber) {
     const primaryFields = [
         ["Product line", unit.productLine ?? "IEC"],
         ["# of cells", getUnitCellCount(unit)],
+        ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
+        ["Corrected HOR", `${unit.correctedHor.toLocaleString()} MBH`],
         ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
         ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
         ["Required capacity", `${unit.requiredCapacity.toLocaleString()} MBH`],
@@ -902,8 +905,6 @@ function renderUnitDetails(unitNumber) {
     const secondaryFields = [
         ["Nominal box size", unit.nominalSize],
         ["Rated R717 capacity", `${unit.r717Tons?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? "N/A"} Tons`],
-        ["Base HOR", `${unit.baseHor.toLocaleString()} MBH`],
-        ["Corrected HOR", `${unit.correctedHor.toLocaleString()} MBH`],
         ["Motor voltage", unit.motorVoltage],
         ["Fan motor", `${unit.fanMotor} HP`],
         ["Air flow", `${unit.airFlowCfm?.toLocaleString() ?? "N/A"} CFM`],
@@ -1060,6 +1061,21 @@ function getUnitCellCount(unit) {
     return Number.isSafeInteger(Number(unit.cellCount)) && Number(unit.cellCount) >= 1
         ? Number(unit.cellCount)
         : 1;
+}
+
+function addEngineeringDetails(unit) {
+    const details = window.iecEngineeringDetails?.[unit.model];
+    if (!details) return unit;
+
+    const cellCount = getUnitCellCount(unit);
+    return {
+        ...unit,
+        nominalSize: unit.nominalSize ?? details.nominalSize,
+        r717Tons: unit.r717Tons ?? details.r717Tons * cellCount,
+        shippingWeightLb: unit.shippingWeightLb ?? details.shippingWeightLb * cellCount,
+        heaviestSectionWeightLb: unit.heaviestSectionWeightLb ?? details.heaviestSectionWeightLb,
+        operatingWeightLb: unit.operatingWeightLb ?? details.operatingWeightLb * cellCount
+    };
 }
 
 function getUnitProductFamily(unit) {
@@ -1552,7 +1568,10 @@ try {
 
     const savedQuotedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
     if (savedQuotedUnits && typeof savedQuotedUnits === "object" && !Array.isArray(savedQuotedUnits)) {
-        quotedUnits = savedQuotedUnits;
+        quotedUnits = Object.fromEntries(Object.entries(savedQuotedUnits).map(([unitNumber, unit]) => [
+            unitNumber,
+            unit && typeof unit === "object" ? addEngineeringDetails(unit) : unit
+        ]));
     }
     const savedMultiplier = Number(sessionStorage.getItem("selectsgs-cost-multiplier"));
     if (Number.isFinite(savedMultiplier) && savedMultiplier > 0 && savedMultiplier <= 1) {
