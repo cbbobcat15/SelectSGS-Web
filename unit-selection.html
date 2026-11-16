@@ -43,9 +43,10 @@
 
         .btr-design-layout {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+            grid-template-columns: minmax(260px, 300px) minmax(260px, 300px);
             align-items: start;
-            gap: 24px;
+            justify-content: start;
+            gap: 20px;
         }
 
         .btr-derived-values h2 {
@@ -71,8 +72,107 @@
             min-height: 32px;
             padding: 7px;
             border: 1px solid #8797a5;
-            background: #e8c99e;
+            background: #eef5ff;
+            color: #263746;
+            font-weight: bold;
             text-align: center;
+        }
+
+        .btr-results-panel {
+            margin-top: 24px;
+        }
+
+        .btr-results-heading-row {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: end;
+            gap: 16px;
+        }
+
+        .btr-results-heading-row h2,
+        .btr-results-heading-row h3 {
+            margin: 0 0 8px;
+            color: #004f9f;
+        }
+
+        .btr-results-heading-row h3 {
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        .btr-results-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .btr-results-toolbar button {
+            margin: 0;
+        }
+
+        .btr-result-filters {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+        }
+
+        .btr-result-filter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btr-result-filter label {
+            margin: 0;
+            font-weight: normal;
+        }
+
+        .btr-result-filter input {
+            width: 68px;
+            min-width: 68px;
+            margin: 0;
+            padding: 6px;
+        }
+
+        .btr-altitude-warning {
+            margin: 10px 0;
+            color: #a12622;
+            font-weight: bold;
+        }
+
+        .btr-results-table-wrapper {
+            max-height: 420px;
+            overflow: auto;
+            border: 1px solid #8797a5;
+        }
+
+        .btr-results-table {
+            min-width: 620px;
+            margin: 0;
+            background: white;
+        }
+
+        .btr-results-table th {
+            position: sticky;
+            top: 0;
+            background: #eef5ff;
+            color: #263746;
+        }
+
+        .btr-results-table tbody tr {
+            cursor: default;
+        }
+
+        .btr-results-table tbody tr:hover {
+            background: transparent;
+        }
+
+        #btr-results-status {
+            margin: 8px 0 0;
+            color: #53677a;
         }
 
         button {
@@ -212,6 +312,13 @@
             overflow-wrap: anywhere;
         }
 
+        @media (max-width: 700px) {
+            .btr-design-layout {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 8px;
+            }
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 12px;
@@ -220,10 +327,21 @@
             .container {
                 padding: 20px;
             }
+        }
 
-            .btr-design-layout {
-                grid-template-columns: minmax(0, 1fr);
-                gap: 8px;
+        @media (max-width: 600px) {
+            .btr-results-heading-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .btr-results-heading-row h3 {
+                text-align: left;
+            }
+
+            .btr-results-toolbar {
+                align-items: flex-start;
+                flex-direction: column;
             }
         }
     </style>
@@ -354,7 +472,44 @@
         </div>
     </div>
 
-    <div class="action-bar">
+    <section id="btr-results-panel" class="btr-results-panel" aria-labelledby="btr-results-heading" hidden>
+        <div class="btr-results-heading-row">
+            <h2 id="btr-results-heading">4. Select Unit</h2>
+            <h3>Filters</h3>
+        </div>
+        <div class="btr-results-toolbar">
+            <button id="btr-find-units" type="button">Find Units</button>
+            <div class="btr-result-filters">
+                <div class="btr-result-filter">
+                    <label for="btr-capacity-under">Cap % Under</label>
+                    <input id="btr-capacity-under" type="number" min="-100" max="0" step="any" value="-15" required>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="btr-capacity-over">Cap % Over</label>
+                    <input id="btr-capacity-over" type="number" min="0" step="any" value="15" required>
+                </div>
+            </div>
+        </div>
+        <p class="btr-altitude-warning">** For installations above 1000 ft. please consult factory</p>
+        <div class="btr-results-table-wrapper">
+            <table class="btr-results-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Model</th>
+                        <th scope="col">Coil Cap<br>BTUH/TD</th>
+                        <th scope="col">Cap % Diff</th>
+                        <th scope="col">Face Vel<br>(FPM)</th>
+                        <th scope="col">List Price</th>
+                        <th scope="col">Fan HP</th>
+                    </tr>
+                </thead>
+                <tbody id="btr-results-rows"></tbody>
+            </table>
+        </div>
+        <p id="btr-results-status" role="status">Click Find Units to search matching coils.</p>
+    </section>
+
+    <div id="unit-selection-actions" class="action-bar">
         <button type="button" onclick="findUnit()">Find Unit</button>
         <button id="add-to-quote" type="button" disabled>Add to Quote</button>
     </div>
@@ -366,6 +521,7 @@
 
 <script src="dtc-units.js?v=20261111-1442"></script>
 <script src="iec-engineering-data.js?v=20261111-2008"></script>
+<script src="btr-ratings.js?v=20261116-2140"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
 <script>
 
@@ -662,7 +818,14 @@ const btrInputs = document.getElementById("btr-inputs");
 const btrDesignInputs = [...btrInputs.querySelectorAll("[data-btr-design-input]")];
 const btrSelectionFields = document.getElementById("btr-selection-fields");
 const btrDerivedValues = document.getElementById("btr-derived-values");
+const btrResultsPanel = document.getElementById("btr-results-panel");
+const btrResultsRows = document.getElementById("btr-results-rows");
+const btrResultsStatus = document.getElementById("btr-results-status");
+const btrCapacityUnderInput = document.getElementById("btr-capacity-under");
+const btrCapacityOverInput = document.getElementById("btr-capacity-over");
+const unitSelectionActions = document.getElementById("unit-selection-actions");
 const roomLoadInput = document.getElementById("room-load");
+const numberOfEvaporatorsInput = document.getElementById("number-of-evaporators");
 const roomTemperatureInput = document.getElementById("room-temperature");
 const targetTdInput = document.getElementById("target-td");
 
@@ -688,27 +851,42 @@ function getResultColumns() {
     return iecResultColumns;
 }
 
-function updateBtrSelectionVisibility() {
-    const designInputsPopulated = btrDesignInputs.every(input =>
-        input.dataset.populated === "true" && input.checkValidity()
+function areBtrDesignInputsPopulated() {
+    return btrDesignInputs.every(input =>
+        (input.dataset.populated === "true" ||
+            input.id === "number-of-evaporators" ||
+            input.id === "room-temperature") &&
+        input.checkValidity()
     );
+}
+
+function updateBtrSelectionVisibility() {
+    const designInputsPopulated = areBtrDesignInputsPopulated();
     const showAdditionalFields = activeProductLine === "BTR" && designInputsPopulated;
     btrSelectionFields.hidden = !showAdditionalFields;
     btrDerivedValues.hidden = !showAdditionalFields;
+    const selectionsComplete = [...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
+    btrResultsPanel.hidden = !showAdditionalFields || !selectionsComplete;
     if (!showAdditionalFields) return;
 
     const roomTemperature = Number(roomTemperatureInput.value);
     const targetTd = Number(targetTdInput.value);
     const targetCoilTemperature = roomTemperature - targetTd;
-    const formatValue = value => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
     document.getElementById("coil-rating-condition").textContent =
         targetCoilTemperature > 25 ? "WET" : "Frosted";
     document.getElementById("max-face-velocity").textContent =
         roomTemperature > 34 ? "630" : "N/A";
-    document.getElementById("target-coil-temperature").textContent = formatValue(targetCoilTemperature);
+    document.getElementById("target-coil-temperature").textContent = formatBtrNumber(targetCoilTemperature);
     document.getElementById("target-capacity-per-coil").textContent = targetTd > 0
-        ? formatValue(Number(roomLoadInput.value) * 12000 / targetTd)
+        ? formatBtrNumber(Number(roomLoadInput.value) * 12000 / targetTd / Number(numberOfEvaporatorsInput.value))
         : "N/A";
+
+    btrResultsPanel.hidden = ![...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
+}
+
+function clearBtrResults() {
+    btrResultsRows.replaceChildren();
+    btrResultsStatus.textContent = "Click Find Units to refresh the results.";
 }
 
 function setProductLine(productLine) {
@@ -717,9 +895,16 @@ function setProductLine(productLine) {
     const isBtr = activeProductLine === "BTR";
     condenserInputs.hidden = isBtr;
     btrInputs.hidden = !isBtr;
+    btrResultsPanel.hidden = true;
+    unitSelectionActions.hidden = isBtr;
+    document.getElementById("result").hidden = isBtr;
     updateBtrSelectionVisibility();
     r22Option.disabled = activeProductLine !== "IEC";
     if (activeProductLine !== "IEC") refrigerantSelect.value = "R717";
+}
+
+function formatBtrNumber(value, maximumFractionDigits = 2) {
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value);
 }
 
 function formatCurrency(value) {
@@ -729,6 +914,98 @@ function formatCurrency(value) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     }).format(value);
+}
+
+function findBtrUnits() {
+    const invalidDesignInput = btrDesignInputs.find(input => !input.checkValidity());
+    if (invalidDesignInput) {
+        invalidDesignInput.reportValidity();
+        btrResultsStatus.textContent = "Enter valid values for all four BTR design inputs.";
+        return;
+    }
+    if (!areBtrDesignInputsPopulated()) {
+        btrResultsStatus.textContent = "Enter Room Load and Target TD to search for BTR units.";
+        return;
+    }
+
+    const invalidSelectionInput = [...btrSelectionFields.querySelectorAll("select")].find(input => !input.checkValidity());
+    if (invalidSelectionInput) {
+        invalidSelectionInput.reportValidity();
+        btrResultsStatus.textContent = "Choose a value for each BTR selection field.";
+        return;
+    }
+
+    const invalidFilterInput = [btrCapacityUnderInput, btrCapacityOverInput].find(input =>
+        !input.checkValidity() || input.value.trim() === ""
+    );
+    if (invalidFilterInput) {
+        invalidFilterInput.reportValidity();
+        btrResultsStatus.textContent = "Enter valid capacity tolerance filters.";
+        return;
+    }
+
+    const roomLoad = Number(roomLoadInput.value);
+    const targetTd = Number(targetTdInput.value);
+    const evaporatorCount = Number(numberOfEvaporatorsInput.value);
+    const targetCapacity = roomLoad * 12000 / targetTd / evaporatorCount;
+    if (!Number.isFinite(targetCapacity) || targetCapacity <= 0) {
+        btrResultsStatus.textContent = "Enter a Room Load and Target TD that produce a positive target capacity per coil.";
+        return;
+    }
+
+    const material = document.getElementById("coil-material").value;
+    const materialGroup = material === "SS/AL" || material === "AL/AL" ? "ssOrAl" : "steelOrCu";
+    const capacityType = document.getElementById("refrigerant-feed").value === "DX" ? "dx" : "recirc";
+    const availableUnits = window.selectSgsBtrRatings;
+    if (!Array.isArray(availableUnits) || availableUnits.length === 0) {
+        btrResultsStatus.textContent = "BTR rating data could not be loaded. Refresh the page and try again.";
+        console.error("BTR rating data could not be loaded.");
+        return;
+    }
+
+    const minimumDifference = Number(btrCapacityUnderInput.value);
+    const maximumDifference = Number(btrCapacityOverInput.value);
+    const maximumFaceVelocity = Number(roomTemperatureInput.value) > 34 ? 630 : Infinity;
+    const matches = availableUnits.flatMap(unit => {
+        const coilCapacity = unit.capacities[materialGroup][capacityType];
+        const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
+        const faceVelocity = unit.cfm / unit.coilFaceArea;
+        if (capacityDifference < minimumDifference || capacityDifference > maximumDifference ||
+            faceVelocity > maximumFaceVelocity) {
+            return [];
+        }
+
+        return [{
+            model: unit.model,
+            coilCapacity,
+            capacityDifference,
+            faceVelocity,
+            listPrice: 1,
+            fanHp: unit.fans.split("x").pop().trim()
+        }];
+    });
+
+    btrResultsRows.replaceChildren();
+    for (const unit of matches) {
+        const row = document.createElement("tr");
+        const values = [
+            unit.model,
+            formatBtrNumber(unit.coilCapacity, 0),
+            `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
+            formatBtrNumber(unit.faceVelocity, 0),
+            formatCurrency(unit.listPrice),
+            `${unit.fanHp} HP`
+        ];
+        for (const value of values) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.append(cell);
+        }
+        btrResultsRows.append(row);
+    }
+    btrResultsStatus.textContent = matches.length
+        ? `${matches.length} matching coil${matches.length === 1 ? "" : "s"} found.`
+        : "No coils match the selected capacity range.";
 }
 
 function renderMatchingUnits(result) {
@@ -813,6 +1090,7 @@ document.getElementById("result").addEventListener("keydown", event => {
 
 productLineSelect.addEventListener("change", () => {
     setProductLine(productLineSelect.value);
+    clearBtrResults();
     selectedUnitModel = null;
     selectedCellCount = null;
     matchingUnits = [];
@@ -826,12 +1104,21 @@ productLineSelect.addEventListener("change", () => {
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #btr-capacity-under, #btr-capacity-over")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
+                if (input === targetTdInput) {
+                    input.setCustomValidity(Number(input.value) > 0 ? "" : "Target TD must be greater than zero.");
+                }
                 input.dataset.populated = String(input.value.trim() !== "" && input.checkValidity());
                 updateBtrSelectionVisibility();
+                clearBtrResults();
+            } else if (input.matches("#btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed")) {
+                updateBtrSelectionVisibility();
+                clearBtrResults();
+            } else if (input.matches("#btr-capacity-under, #btr-capacity-over")) {
+                clearBtrResults();
             }
             if (!selectedUnitModel) return;
             selectedUnitModel = null;
@@ -840,6 +1127,8 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
         });
     }
 }
+
+document.getElementById("btr-find-units").addEventListener("click", findBtrUnits);
 
 function selectMatchingUnit(model, cellCount) {
     selectedUnitModel = model;
@@ -905,25 +1194,7 @@ function findUnit() {
     document.getElementById("add-to-quote").disabled = true;
     const result = document.getElementById("result");
     if (activeProductLine === "BTR") {
-        const invalidDesignInput = btrDesignInputs.find(input => !input.checkValidity());
-        if (invalidDesignInput) {
-            invalidDesignInput.reportValidity();
-            result.textContent = "Enter valid values for all four BTR design inputs.";
-            return;
-        }
-        if (btrDesignInputs.some(input => input.dataset.populated !== "true")) {
-            result.textContent = "Enter each of the four BTR design inputs to show the selection dropdowns.";
-            return;
-        }
-
-        const invalidSelectionInput = [...btrSelectionFields.querySelectorAll("select")].find(input => !input.checkValidity());
-        if (invalidSelectionInput) {
-            invalidSelectionInput.reportValidity();
-            result.textContent = "Choose a value for each BTR selection field.";
-            return;
-        }
-
-        result.textContent = "BTR design inputs are ready. Rating-based unit matching will be added in a later step.";
+        findBtrUnits();
         return;
     }
 
