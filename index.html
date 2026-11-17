@@ -957,7 +957,16 @@ function getBtrFanSpecifications(unit) {
 function getBtrAirUnitModelNumber(unit) {
     const materialCode = { "AL/AL": "A", "CU/AL": "C", "SS/AL": "B" }[unit.coilMaterial];
     const refrigerantCode = { R717: "A" }[unit.refrigerant];
-    const defrostCode = { A: "IA", HGC: "IHGC", HTS: "HTS", HGS: "HGP", WD: "WD" }[unit.defrostType];
+    const panOptionId = unit.options?.find(option => isBtrDrainPanOptionId(option.optionId))?.optionId;
+    const insulatedCoverSelected = panOptionId === btrInsulatedCoverOptionId ||
+        panOptionId === btrHygienicCoverOptionId;
+    const defrostCode = {
+        A: insulatedCoverSelected ? "IA" : "A",
+        HGC: insulatedCoverSelected ? "IHGC" : "HGC",
+        HTS: "HTS",
+        HGS: "HGP",
+        WD: insulatedCoverSelected ? "IWD" : "WD"
+    }[unit.defrostType];
     const coilModelDigits = unit.model?.match(/^BTR-(\d+)$/)?.[1];
     if (!materialCode || !refrigerantCode || !defrostCode || !coilModelDigits || !unit.refrigerantFeed) {
         return "Unavailable";
@@ -1256,7 +1265,7 @@ function getProductPricing(unit) {
             option.id === "FCPan_SS_Welded_IA_IHGC_IED"
         );
         if (!hygienicCoverPricing) return null;
-        const includedInBase = ["HTS", "HTP", "HGS", "HGP"].includes(unit.defrostType);
+        const includedInBase = ["A", "HGC", "HTS", "HTP", "HGS", "HGP"].includes(unit.defrostType);
         const drainPanOptions = [
             {
                 id: btrNoCoverOptionId,
@@ -1351,7 +1360,11 @@ function getUnitOptions(unit) {
         if (drainPanIndex > 0) {
             [unit.options[0], unit.options[drainPanIndex]] = [unit.options[drainPanIndex], unit.options[0]];
         }
-        if (drainPanIndex === -1) unit.options[0].optionId = btrNoCoverOptionId;
+        if (drainPanIndex === -1) {
+            unit.options[0].optionId = unit.defrostType === "WD"
+                ? btrNoCoverOptionId
+                : btrInsulatedCoverOptionId;
+        }
     }
 
     return unit.options;
@@ -2132,6 +2145,10 @@ optionsPanel.addEventListener("change", event => {
             }
         } else {
             options[index].optionId = select.value;
+        }
+        if (activeUnit.productLine === "BTR" && index === 0) {
+            const modelValue = document.querySelector("#unit-details-list .unit-detail-model strong");
+            if (modelValue) modelValue.textContent = getBtrAirUnitModelNumber(activeUnit);
         }
         saveQuotedUnits();
         updateQuotePrices();
