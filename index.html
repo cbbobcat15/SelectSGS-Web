@@ -833,6 +833,7 @@
 <script src="product-pricing.js?v=20261111-1540"></script>
 <script src="iec-engineering-data.js?v=20261111-2016"></script>
 <script src="btr-ratings.js?v=20261117-1530"></script>
+<script src="btr-product-pricing.js?v=20261117-1600"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -899,13 +900,9 @@ function renderUnitDetails(unitNumber) {
     }
 
     const isBtr = unit.productLine === "BTR";
-    if (isBtr) {
-        optionsPanel.hidden = true;
-    } else {
-        const options = getUnitOptions(unit);
-        renderOptionRows(options, unit);
-        optionsPanel.hidden = false;
-    }
+    const options = getUnitOptions(unit);
+    renderOptionRows(options, unit);
+    optionsPanel.hidden = false;
 
     const primaryFields = isBtr ? [
         ["Product line", unit.productLine],
@@ -1145,12 +1142,30 @@ function getUnitProductFamily(unit) {
 }
 
 function isPricedProductLine(unit) {
-    return unit.productLine === "IEC" || unit.productLine === "DTC" ||
+    return unit.productLine === "IEC" || unit.productLine === "DTC" || unit.productLine === "BTR" ||
         typeof unit.model === "string" && /^(IEC|DTC)-/.test(unit.model);
 }
 
 function getProductPricing(unit) {
-    return isPricedProductLine(unit) ? productPrices[unit.model] ?? null : null;
+    if (unit.productLine === "BTR") {
+        const materialPricing = window.selectSgsBtrProductPricing?.models?.[unit.model]?.[unit.coilMaterial];
+        const basePrice = materialPricing?.basePrices?.[unit.defrostType];
+        if (!materialPricing || !Number.isFinite(basePrice)) return null;
+
+        const defrostOptionTypes = {
+            FCPan_NoCover_WD: ["WD"],
+            FCPan_SS_Welded_IA_IHGC_IED: ["A", "HGC"],
+            inv_ready_mtr_WD: ["WD"]
+        };
+        return {
+            basePrice,
+            options: materialPricing.options.filter(option =>
+                !defrostOptionTypes[option.id] || defrostOptionTypes[option.id].includes(unit.defrostType)
+            )
+        };
+    }
+
+    return productPrices[unit.model] ?? null;
 }
 
 function getProductOptions(unit) {
@@ -1600,8 +1615,7 @@ function updateUnitList() {
     document.getElementById("unit-details").hidden = !projectIsValid;
     optionsPanel.hidden = !projectIsValid ||
         !Number.isInteger(activeUnitNumber) ||
-        !quotedUnits[activeUnitNumber] ||
-        quotedUnits[activeUnitNumber].productLine === "BTR";
+        !quotedUnits[activeUnitNumber];
 }
 
 try {
