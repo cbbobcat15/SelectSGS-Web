@@ -24,3 +24,60 @@ window.selectSgsBtrRatings = [
     { model: "BTR-416", coilFaceArea: 41.7, cfm: 22800, fans: "4 x 1/2", capacities: { ssOrAl: { dx: 14240, recirc: 16500 }, steelOrCu: { dx: 12600, recirc: 14600 } } },
     { model: "BTR-418", coilFaceArea: 41.7, cfm: 21600, fans: "4 x 1/2", capacities: { ssOrAl: { dx: 16160, recirc: 18290 }, steelOrCu: { dx: 14560, recirc: 16480 } } }
 ];
+
+const btrShippingWeightsLb = {
+    "BTR-24": { "SS/AL": 525, "AL/AL": 491, "Steel": 666, "CU/AL": 525 },
+    "BTR-26": { "SS/AL": 584, "AL/AL": 536, "Steel": 796, "CU/AL": 584 },
+    "BTR-28": { "SS/AL": 634, "AL/AL": 566, "Steel": 946, "CU/AL": 634 },
+    "BTR-34": { "SS/AL": 750, "AL/AL": 702, "Steel": 962, "CU/AL": 750 },
+    "BTR-36": { "SS/AL": 824, "AL/AL": 752, "Steel": 1152, "CU/AL": 824 },
+    "BTR-38": { "SS/AL": 908, "AL/AL": 802, "Steel": 1412, "CU/AL": 908 },
+    "BTR-44": { "SS/AL": 1006, "AL/AL": 938, "Steel": 1278, "CU/AL": 1006 },
+    "BTR-46": { "SS/AL": 1115, "AL/AL": 1008, "Steel": 1538, "CU/AL": 1115 },
+    "BTR-48": { "SS/AL": 1233, "AL/AL": 1098, "Steel": 1838, "CU/AL": 1233 },
+    "BTR-54": { "SS/AL": 1212, "AL/AL": 1125, "Steel": 1565, "CU/AL": 1212 },
+    "BTR-56": { "SS/AL": 1335, "AL/AL": 1205, "Steel": 1895, "CU/AL": 1335 },
+    "BTR-58": { "SS/AL": 1479, "AL/AL": 1305, "Steel": 2325, "CU/AL": 1479 },
+    "BTR-114": { "SS/AL": 578, "AL/AL": 536, "Steel": 756, "CU/AL": 578 },
+    "BTR-116": { "SS/AL": 688, "AL/AL": 626, "Steel": 906, "CU/AL": 688 },
+    "BTR-118": { "SS/AL": 799, "AL/AL": 716, "Steel": 1056, "CU/AL": 799 },
+    "BTR-214": { "SS/AL": 1072, "AL/AL": 989, "Steel": 1339, "CU/AL": 1072 },
+    "BTR-216": { "SS/AL": 1274, "AL/AL": 1159, "Steel": 1619, "CU/AL": 1274 },
+    "BTR-218": { "SS/AL": 1395, "AL/AL": 1239, "Steel": 1959, "CU/AL": 1395 },
+    "BTR-314": { "SS/AL": 1536, "AL/AL": 1421, "Steel": 1941, "CU/AL": 1536 },
+    "BTR-316": { "SS/AL": 1798, "AL/AL": 1621, "Steel": 2271, "CU/AL": 1798 },
+    "BTR-318": { "SS/AL": 1970, "AL/AL": 1741, "Steel": 2761, "CU/AL": 1970 },
+    "BTR-414": { "SS/AL": 1950, "AL/AL": 1794, "Steel": 2364, "CU/AL": 1950 },
+    "BTR-416": { "SS/AL": 2333, "AL/AL": 2104, "Steel": 3064, "CU/AL": 2333 },
+    "BTR-418": { "SS/AL": 2536, "AL/AL": 2380, "Steel": 3764, "CU/AL": 2536 }
+};
+
+const btrDimensionsBySeries = {
+    2: { length: 94.83, width: 26.94, heights: { 4: 25.675, 6: 28.35, 8: 31.025 } },
+    3: { length: 128.75, width: 26.94, heights: { 4: 25.675, 6: 28.35, 8: 31.025 } },
+    4: { length: 162.63, width: 26.94, heights: { 4: 25.675, 6: 28.35, 8: 31.025 } },
+    5: { length: 196.69, width: 26.94, heights: { 4: 25.675, 6: 28.35, 8: 31.025 } }
+};
+
+const btrDimensionsByPrefix = {
+    1: { length: 60, width: 40.875, heights: { 4: 30.375, 6: 36.187, 8: 41 } },
+    2: { length: 104.625, width: 40.875, heights: { 4: 30.375, 6: 36.187, 8: 41 } },
+    3: { length: 143.625, width: 40.875, heights: { 4: 30.375, 6: 36.187, 8: 41 } },
+    4: { length: 182.625, width: 40.875, heights: { 4: 30.375, 6: 36.187, 8: 41 } }
+};
+
+window.selectSgsBtrPhysicalSpecs = Object.fromEntries(window.selectSgsBtrRatings.map(unit => {
+    const modelNumber = Number(unit.model.slice(4));
+    const hasThreeDigitModel = modelNumber >= 100;
+    const series = hasThreeDigitModel ? Math.floor(modelNumber / 100) : Math.floor(modelNumber / 10);
+    const dimensions = hasThreeDigitModel ? btrDimensionsByPrefix[series] : btrDimensionsBySeries[series];
+    const coilRows = Number(unit.model.slice(-1));
+    return [unit.model, {
+        shippingWeightsLb: btrShippingWeightsLb[unit.model],
+        dimensionsIn: {
+            length: dimensions.length,
+            width: dimensions.width,
+            height: dimensions.heights[coilRows]
+        }
+    }];
+}));

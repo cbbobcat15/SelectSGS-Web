@@ -482,6 +482,18 @@
             gap: 8px;
         }
 
+        .btr-physical-specifications {
+            padding: 10px;
+            border: 1px solid #8797a5;
+            background: #e9edf1;
+        }
+
+        .btr-physical-specifications h3 {
+            margin: 0 0 8px;
+            color: #004f9f;
+            font-size: 1rem;
+        }
+
         .options-panel h2 {
             margin: 0;
             font-size: 1.1rem;
@@ -820,6 +832,7 @@
 </div>
 <script src="product-pricing.js?v=20261111-1540"></script>
 <script src="iec-engineering-data.js?v=20261111-2016"></script>
+<script src="btr-ratings.js?v=20261117-1530"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -961,6 +974,31 @@ function renderUnitDetails(unitNumber) {
         columns.append(group);
     }
     details.append(model, columns);
+
+    if (isBtr) {
+        const physicalSpecs = window.selectSgsBtrPhysicalSpecs?.[unit.model];
+        const shippingWeight = physicalSpecs?.shippingWeightsLb?.[unit.coilMaterial];
+        const dimensions = physicalSpecs?.dimensionsIn;
+        const box = document.createElement("section");
+        box.className = "btr-physical-specifications";
+        const heading = document.createElement("h3");
+        heading.textContent = "Weight & Dimensions";
+        const specifications = document.createElement("dl");
+        for (const [label, value] of [
+            ["Shipping weight", Number.isFinite(shippingWeight) ? `${shippingWeight.toLocaleString()} lb` : "Unavailable"],
+            ["Overall dimensions (L x W x H)", dimensions
+                ? `${dimensions.length} x ${dimensions.width} x ${dimensions.height} in`
+                : "Unavailable"]
+        ]) {
+            const term = document.createElement("dt");
+            term.textContent = label;
+            const description = document.createElement("dd");
+            description.textContent = value;
+            specifications.append(term, description);
+        }
+        box.append(heading, specifications);
+        details.append(box);
+    }
 
     emptyMessage.hidden = true;
     details.hidden = false;
