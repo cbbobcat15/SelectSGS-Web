@@ -885,11 +885,30 @@ function renderUnitDetails(unitNumber) {
         return;
     }
 
-    const options = getUnitOptions(unit);
-    renderOptionRows(options, unit);
-    optionsPanel.hidden = false;
+    const isBtr = unit.productLine === "BTR";
+    if (isBtr) {
+        optionsPanel.hidden = true;
+    } else {
+        const options = getUnitOptions(unit);
+        renderOptionRows(options, unit);
+        optionsPanel.hidden = false;
+    }
 
-    const primaryFields = [
+    const primaryFields = isBtr ? [
+        ["Product line", unit.productLine],
+        ["Location", unitRow ? unitRow.querySelector('[data-unit-field="location"]').value : unit.location],
+        ["Unit tag", unitRow ? unitRow.querySelector('[data-unit-field="tag"]').value : unit.tag],
+        ["Room load", unit.roomLoad == null ? undefined : `${unit.roomLoad} TR`],
+        ["# of Evaps", unit.numberOfEvaporators],
+        ["Room temperature", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
+        ["Target TD", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
+        ["Target capacity per coil", unit.targetCapacity == null ? undefined : `${unit.targetCapacity.toLocaleString()} BTUH/TD`],
+        ["Refrigerant", unit.refrigerant],
+        ["Coil material", unit.coilMaterial],
+        ["Defrost type", unit.defrostType],
+        ["Refrigerant feed", unit.refrigerantFeed],
+        ["Coil rating condition", unit.coilRatingCondition]
+    ] : [
         ["Product line", unit.productLine ?? "IEC"],
         ["# of cells", getUnitCellCount(unit)],
         ["Base HOR", `${unit.baseHor.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MBH`],
@@ -902,7 +921,12 @@ function renderUnitDetails(unitNumber) {
         ["Condensing temperature", `${unit.condensingTemperature} °F`],
         ["Wet bulb temperature", `${unit.wetBulbTemperature} °F`]
     ];
-    const secondaryFields = [
+    const secondaryFields = isBtr ? [
+        ["Rated coil capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
+        ["Capacity difference", unit.capacityDifference == null ? undefined : `${unit.capacityDifference.toFixed(1)}%`],
+        ["Face velocity", unit.faceVelocity == null ? undefined : `${unit.faceVelocity.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
+        ["Fan HP", unit.fanHp == null ? undefined : `${unit.fanHp} HP`]
+    ] : [
         ["Nominal box size", unit.nominalSize],
         ["Rated R717 capacity", `${unit.r717Tons?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? "N/A"} Tons`],
         ["Motor voltage", unit.motorVoltage],
@@ -1538,7 +1562,8 @@ function updateUnitList() {
     document.getElementById("unit-details").hidden = !projectIsValid;
     optionsPanel.hidden = !projectIsValid ||
         !Number.isInteger(activeUnitNumber) ||
-        !quotedUnits[activeUnitNumber];
+        !quotedUnits[activeUnitNumber] ||
+        quotedUnits[activeUnitNumber].productLine === "BTR";
 }
 
 try {

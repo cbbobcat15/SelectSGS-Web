@@ -163,11 +163,17 @@
         }
 
         .btr-results-table tbody tr {
-            cursor: default;
+            cursor: pointer;
         }
 
         .btr-results-table tbody tr:hover {
-            background: transparent;
+            background: #eef5ff;
+        }
+
+        .btr-results-table tbody tr[aria-selected="true"] {
+            background: #cce2f8;
+            outline: 2px solid #004f9f;
+            outline-offset: -2px;
         }
 
         #btr-results-status {
@@ -510,7 +516,7 @@
     </section>
 
     <div id="unit-selection-actions" class="action-bar">
-        <button type="button" onclick="findUnit()">Find Unit</button>
+        <button id="find-unit" type="button" onclick="findUnit()">Find Unit</button>
         <button id="add-to-quote" type="button" disabled>Add to Quote</button>
     </div>
 
@@ -808,6 +814,8 @@ let sortDirection = "asc";
 let currentResultDetails;
 let selectedUnitModel = null;
 let selectedCellCount = null;
+let btrMatchingUnits = [];
+let selectedBtrUnitModel = null;
 let activeProductLine = "IEC";
 const quoteUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
 const productLineSelect = document.getElementById("product-line");
@@ -824,6 +832,8 @@ const btrResultsStatus = document.getElementById("btr-results-status");
 const btrCapacityUnderInput = document.getElementById("btr-capacity-under");
 const btrCapacityOverInput = document.getElementById("btr-capacity-over");
 const unitSelectionActions = document.getElementById("unit-selection-actions");
+const findUnitButton = document.getElementById("find-unit");
+const addToQuoteButton = document.getElementById("add-to-quote");
 const roomLoadInput = document.getElementById("room-load");
 const numberOfEvaporatorsInput = document.getElementById("number-of-evaporators");
 const roomTemperatureInput = document.getElementById("room-temperature");
@@ -885,8 +895,11 @@ function updateBtrSelectionVisibility() {
 }
 
 function clearBtrResults() {
+    btrMatchingUnits = [];
+    selectedBtrUnitModel = null;
     btrResultsRows.replaceChildren();
     btrResultsStatus.textContent = "Click Find Units to refresh the results.";
+    addToQuoteButton.disabled = true;
 }
 
 function setProductLine(productLine) {
@@ -896,7 +909,8 @@ function setProductLine(productLine) {
     condenserInputs.hidden = isBtr;
     btrInputs.hidden = !isBtr;
     btrResultsPanel.hidden = true;
-    unitSelectionActions.hidden = isBtr;
+    unitSelectionActions.hidden = false;
+    findUnitButton.hidden = isBtr;
     document.getElementById("result").hidden = isBtr;
     updateBtrSelectionVisibility();
     r22Option.disabled = activeProductLine !== "IEC";
@@ -917,6 +931,10 @@ function formatCurrency(value) {
 }
 
 function findBtrUnits() {
+    btrMatchingUnits = [];
+    selectedBtrUnitModel = null;
+    addToQuoteButton.disabled = true;
+    btrResultsRows.replaceChildren();
     const invalidDesignInput = btrDesignInputs.find(input => !input.checkValidity());
     if (invalidDesignInput) {
         invalidDesignInput.reportValidity();
@@ -985,9 +1003,13 @@ function findBtrUnits() {
         }];
     });
 
+    btrMatchingUnits = matches;
     btrResultsRows.replaceChildren();
     for (const unit of matches) {
         const row = document.createElement("tr");
+        row.dataset.unitModel = unit.model;
+        row.tabIndex = 0;
+        row.setAttribute("aria-selected", "false");
         const values = [
             unit.model,
             formatBtrNumber(unit.coilCapacity, 0),
@@ -1007,6 +1029,29 @@ function findBtrUnits() {
         ? `${matches.length} matching coil${matches.length === 1 ? "" : "s"} found.`
         : "No coils match the selected capacity range.";
 }
+
+function selectBtrUnit(model) {
+    if (!btrMatchingUnits.some(unit => unit.model === model)) return;
+    selectedBtrUnitModel = model;
+    for (const row of btrResultsRows.rows) {
+        row.setAttribute("aria-selected", String(row.dataset.unitModel === model));
+    }
+    addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
+        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+}
+
+btrResultsRows.addEventListener("click", event => {
+    const row = event.target.closest("tr[data-unit-model]");
+    if (row) selectBtrUnit(row.dataset.unitModel);
+});
+
+btrResultsRows.addEventListener("keydown", event => {
+    if ((event.key === "Enter" || event.key === " ") &&
+        event.target.matches("tr[data-unit-model]")) {
+        event.preventDefault();
+        selectBtrUnit(event.target.dataset.unitModel);
+    }
+});
 
 function renderMatchingUnits(result) {
     const { minimumCapacity, maximumCapacity, correctionFactor } = currentResultDetails;
@@ -1137,6 +1182,47 @@ function selectMatchingUnit(model, cellCount) {
 }
 
 document.getElementById("add-to-quote").addEventListener("click", () => {
+    if (activeProductLine === "BTR") {
+        const selectedUnit = btrMatchingUnits.find(unit => unit.model === selectedBtrUnitModel);
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+            return;
+        }
+
+        try {
+            const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
+            const unitRows = JSON.parse(sessionStorage.getItem("selectsgs-unit-rows") || "[]");
+            const unitRow = unitRows[quoteUnitNumber - 1] || {};
+            const roomTemperature = Number(roomTemperatureInput.value);
+            const targetTd = Number(targetTdInput.value);
+            savedUnits[quoteUnitNumber] = {
+                ...selectedUnit,
+                productLine: "BTR",
+                price: selectedUnit.listPrice,
+                cellCount: 1,
+                roomLoad: Number(roomLoadInput.value),
+                numberOfEvaporators: Number(numberOfEvaporatorsInput.value),
+                roomTemperature,
+                targetTd,
+                targetCapacity: Number(roomLoadInput.value) * 12000 / targetTd / Number(numberOfEvaporatorsInput.value),
+                refrigerant: document.getElementById("btr-refrigerant").value,
+                coilMaterial: document.getElementById("coil-material").value,
+                defrostType: document.getElementById("defrost-type").value,
+                refrigerantFeed: document.getElementById("refrigerant-feed").value,
+                coilRatingCondition: roomTemperature - targetTd > 25 ? "WET" : "Frosted",
+                capacityUnder: Number(btrCapacityUnderInput.value),
+                capacityOver: Number(btrCapacityOverInput.value),
+                location: unitRow.location || "",
+                tag: unitRow.tag || ""
+            };
+            sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(savedUnits));
+            window.location.href = `index.html?unit=${quoteUnitNumber}&added=1`;
+        } catch (error) {
+            btrResultsStatus.textContent = "The selected BTR unit could not be added to the quote. Check your browser storage settings and try again.";
+            console.error("Could not save selected BTR unit to quote.", error);
+        }
+        return;
+    }
+
     const selectedUnit = matchingUnits.find(unit =>
         unit.model === selectedUnitModel && unit.cellCount === selectedCellCount
     );
@@ -1281,25 +1367,50 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
         const savedUnit = savedUnits[quoteUnitNumber];
         if (savedUnit) {
             setProductLine(savedUnit.productLine);
-            document.getElementById("Capacity").value = String(savedUnit.requiredCapacity ?? "");
-            document.getElementById("Refrigerant").value = savedUnit.refrigerant ?? "R717";
-            document.getElementById("Condensing Temperature").value = String(savedUnit.condensingTemperature ?? "");
-            document.getElementById("Wet Bulb Temperature").value = String(savedUnit.wetBulbTemperature ?? "");
-            document.getElementById("Motor Voltage").value = savedUnit.motorVoltage ?? "460/3/60";
-            document.getElementById("Lower Tolerance").value = String(savedUnit.lowerTolerance ?? -10);
-            document.getElementById("Upper Tolerance").value = String(savedUnit.upperTolerance ?? 10);
-            document.getElementById("max-cells").value = String(savedUnit.maxCellCount ?? 99);
+            if (savedUnit.productLine === "BTR") {
+                roomLoadInput.value = String(savedUnit.roomLoad ?? "");
+                numberOfEvaporatorsInput.value = String(savedUnit.numberOfEvaporators ?? 1);
+                roomTemperatureInput.value = String(savedUnit.roomTemperature ?? 0);
+                targetTdInput.value = String(savedUnit.targetTd ?? "");
+                targetTdInput.setCustomValidity(Number(targetTdInput.value) > 0 ? "" : "Target TD must be greater than zero.");
+                for (const input of btrDesignInputs) {
+                    input.dataset.populated = String(
+                        input.id === "number-of-evaporators" || input.id === "room-temperature" ||
+                        input.value.trim() !== "" && input.checkValidity()
+                    );
+                }
+                document.getElementById("btr-refrigerant").value = savedUnit.refrigerant ?? "R717";
+                document.getElementById("coil-material").value = savedUnit.coilMaterial ?? "";
+                document.getElementById("defrost-type").value = savedUnit.defrostType ?? "";
+                document.getElementById("refrigerant-feed").value = savedUnit.refrigerantFeed ?? "";
+                btrCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
+                btrCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
+                updateBtrSelectionVisibility();
+                findBtrUnits();
+                if (btrMatchingUnits.some(unit => unit.model === savedUnit.model)) {
+                    selectBtrUnit(savedUnit.model);
+                }
+            } else {
+                document.getElementById("Capacity").value = String(savedUnit.requiredCapacity ?? "");
+                document.getElementById("Refrigerant").value = savedUnit.refrigerant ?? "R717";
+                document.getElementById("Condensing Temperature").value = String(savedUnit.condensingTemperature ?? "");
+                document.getElementById("Wet Bulb Temperature").value = String(savedUnit.wetBulbTemperature ?? "");
+                document.getElementById("Motor Voltage").value = savedUnit.motorVoltage ?? "460/3/60";
+                document.getElementById("Lower Tolerance").value = String(savedUnit.lowerTolerance ?? -10);
+                document.getElementById("Upper Tolerance").value = String(savedUnit.upperTolerance ?? 10);
+                document.getElementById("max-cells").value = String(savedUnit.maxCellCount ?? 99);
 
-            findUnit();
-            const savedCellCount = Number(savedUnit.cellCount ?? 1);
-            if (matchingUnits.some(unit => unit.model === savedUnit.model && unit.cellCount === savedCellCount)) {
-                selectedUnitModel = savedUnit.model;
-                selectedCellCount = savedCellCount;
-                sortKey = getResultColumns().some(column => column.key === savedUnit.searchSortKey)
-                    ? savedUnit.searchSortKey
-                    : "listPrice";
-                sortDirection = savedUnit.searchSortDirection === "desc" ? "desc" : "asc";
-                renderMatchingUnits(document.getElementById("result"));
+                findUnit();
+                const savedCellCount = Number(savedUnit.cellCount ?? 1);
+                if (matchingUnits.some(unit => unit.model === savedUnit.model && unit.cellCount === savedCellCount)) {
+                    selectedUnitModel = savedUnit.model;
+                    selectedCellCount = savedCellCount;
+                    sortKey = getResultColumns().some(column => column.key === savedUnit.searchSortKey)
+                        ? savedUnit.searchSortKey
+                        : "listPrice";
+                    sortDirection = savedUnit.searchSortDirection === "desc" ? "desc" : "asc";
+                    renderMatchingUnits(document.getElementById("result"));
+                }
             }
         }
     } catch (error) {
