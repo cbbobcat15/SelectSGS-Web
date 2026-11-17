@@ -534,6 +534,7 @@
 <script src="iec-engineering-data.js?v=20261111-2008"></script>
 <script src="btr-ratings.js?v=20261117-1624"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
+<script src="btr-product-pricing.js?v=20261117-1600"></script>
 <script>
 
 const wetBulbTemperatures = [
@@ -990,6 +991,12 @@ function findBtrUnits() {
         console.error("BTR rating data could not be loaded.");
         return;
     }
+    const btrPricing = window.selectSgsBtrProductPricing?.models;
+    if (!btrPricing) {
+        btrResultsStatus.textContent = "BTR pricing data could not be loaded. Refresh the page and try again.";
+        console.error("BTR pricing data could not be loaded.");
+        return;
+    }
 
     const minimumDifference = Number(btrCapacityUnderInput.value);
     const maximumDifference = Number(btrCapacityOverInput.value);
@@ -997,6 +1004,7 @@ function findBtrUnits() {
     const reheatCoil = document.getElementById("reheat-coil").value;
     const hasReheat = reheatCoil === "HGR";
     const hasUnsupportedReheatModels = hasReheat && availableUnits.some(unit => unit.model.endsWith("8"));
+    const missingPricing = [];
     const matches = availableUnits.flatMap(unit => {
         const coilCapacity = unit.capacities[materialGroup][capacityType];
         const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
@@ -1007,6 +1015,13 @@ function findBtrUnits() {
             ? availableUnits.find(candidate => candidate.model === reheatModel)
             : unit;
         if (!physicalUnit) return [];
+        const listPrice = btrPricing[physicalUnit.model]?.[material]?.basePrices?.[
+            document.getElementById("defrost-type").value
+        ];
+        if (!Number.isFinite(listPrice)) {
+            missingPricing.push(`${physicalUnit.model} (${material}, ${document.getElementById("defrost-type").value})`);
+            return [];
+        }
         const faceVelocity = physicalUnit.cfm / physicalUnit.coilFaceArea;
         if (capacityDifference < minimumDifference || capacityDifference > maximumDifference ||
             faceVelocity > maximumFaceVelocity) {
@@ -1020,7 +1035,7 @@ function findBtrUnits() {
             capacityDifference,
             faceVelocity,
             airFlowCfm: physicalUnit.cfm,
-            listPrice: 1,
+            listPrice,
             fanHp: getBtrFanMotorHp(unit.fans)
         }];
     });
@@ -1047,9 +1062,14 @@ function findBtrUnits() {
         }
         btrResultsRows.append(row);
     }
-    btrResultsStatus.textContent = matches.length
-        ? `${matches.length} matching coil${matches.length === 1 ? "" : "s"} found.${hasUnsupportedReheatModels ? " HGR is unavailable for 8-row coils because 10-row pricing and specifications are not available." : ""}`
-        : `No coils match the selected capacity range.${hasUnsupportedReheatModels ? " HGR is unavailable for 8-row coils because 10-row pricing and specifications are not available." : ""}`;
+    if (missingPricing.length) {
+        btrResultsStatus.textContent = `Pricing is unavailable for ${missingPricing.join(", ")}. Refresh the pricing data and try again.`;
+        console.error("BTR list pricing is unavailable.", missingPricing);
+    } else {
+        btrResultsStatus.textContent = matches.length
+            ? `${matches.length} matching coil${matches.length === 1 ? "" : "s"} found.${hasUnsupportedReheatModels ? " HGR is unavailable for 8-row coils because 10-row pricing and specifications are not available." : ""}`
+            : `No coils match the selected capacity range.${hasUnsupportedReheatModels ? " HGR is unavailable for 8-row coils because 10-row pricing and specifications are not available." : ""}`;
+    }
 }
 
 function selectBtrUnit(model) {
