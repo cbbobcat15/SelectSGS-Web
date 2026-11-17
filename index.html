@@ -954,6 +954,14 @@ function getBtrFanSpecifications(unit) {
     return null;
 }
 
+function getBtrPhysicalModel(unit) {
+    if (unit.reheatCoil !== "HGR") return unit.model;
+    if (unit.reheatModel) return unit.reheatModel;
+    const digits = unit.model?.match(/^BTR-(\d+)$/)?.[1];
+    if (!digits) return null;
+    return `BTR-${digits.slice(0, -1)}${Number(digits.slice(-1)) + 2}`;
+}
+
 function getBtrAirUnitModelNumber(unit) {
     const materialCode = { "AL/AL": "A", "CU/AL": "C", "SS/AL": "B" }[unit.coilMaterial];
     const refrigerantCode = { R717: "A" }[unit.refrigerant];
@@ -972,7 +980,8 @@ function getBtrAirUnitModelNumber(unit) {
         return "Unavailable";
     }
 
-    return `BTRD${materialCode}${coilModelDigits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}`;
+    const reheatModelDigits = unit.reheatCoil === "HGR" ? `${coilModelDigits.slice(0, -1)}${Number(coilModelDigits.slice(-1))}/2` : coilModelDigits;
+    return `BTRD${materialCode}${reheatModelDigits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${unit.reheatCoil === "HGR" ? "-HGR" : ""}`;
 }
 
 function getBtrFanMotorHpValue(value) {
@@ -1008,7 +1017,9 @@ function renderUnitDetails(unitNumber) {
     renderOptionRows(options, unit);
     optionsPanel.hidden = false;
 
-    const physicalSpecs = isBtr ? window.selectSgsBtrPhysicalSpecs?.[unit.model] : null;
+    const physicalSpecs = isBtr
+        ? window.selectSgsBtrPhysicalSpecs?.[getBtrPhysicalModel(unit)]
+        : null;
     const shippingWeight = physicalSpecs?.shippingWeightsLb?.[unit.coilMaterial];
     const dimensions = physicalSpecs?.dimensionsIn;
     const fanSpecifications = isBtr ? getBtrFanSpecifications(unit) : null;
@@ -1076,7 +1087,7 @@ function renderUnitDetails(unitNumber) {
     const modelLabel = document.createElement("span");
     modelLabel.textContent = "Model";
     const modelValue = document.createElement("strong");
-    modelValue.textContent = unit.model ?? "—";
+    modelValue.textContent = isBtr ? getBtrAirUnitModelNumber(unit) : unit.model ?? "—";
     model.append(modelLabel, modelValue);
 
     const columns = document.createElement("div");
@@ -1257,9 +1268,13 @@ function isPricedProductLine(unit) {
 
 function getProductPricing(unit) {
     if (unit.productLine === "BTR") {
-        const materialPricing = window.selectSgsBtrProductPricing?.models?.[unit.model]?.[unit.coilMaterial];
+        const pricingModel = getBtrPhysicalModel(unit);
+        const materialPricing = window.selectSgsBtrProductPricing?.models?.[pricingModel]?.[unit.coilMaterial];
         const basePrice = materialPricing?.basePrices?.[unit.defrostType];
         if (!materialPricing || !Number.isFinite(basePrice)) return null;
+        if (unit.reheatCoil === "HGR" && !materialPricing.options.some(option => option.id === "Add_Head_HGR")) {
+            return null;
+        }
 
         const hygienicCoverPricing = materialPricing.options.find(option =>
             option.id === "FCPan_SS_Welded_IA_IHGC_IED"
@@ -1365,6 +1380,23 @@ function getUnitOptions(unit) {
                 ? btrNoCoverOptionId
                 : btrInsulatedCoverOptionId;
         }
+        if (unit.reheatCoil === "HGR" && availableOptionIds.has("Add_Head_HGR")) {
+            const drainPan = unit.options[0];
+            const selectedOptions = unit.options.slice(1).filter(option =>
+                option.optionId && option.optionId !== "Add_Head_HGR"
+            ).slice(0, lineCount - 2);
+            unit.options.splice(
+                0,
+                unit.options.length,
+                drainPan,
+                { optionId: "Add_Head_HGR", quantity: 1 },
+                ...selectedOptions,
+                ...Array.from({ length: lineCount - selectedOptions.length - 2 }, () => ({
+                    optionId: "",
+                    quantity: 1
+                }))
+            );
+        }
     }
 
     return unit.options;
@@ -1440,12 +1472,13 @@ function renderOptionRows(options, unit) {
     selectableOptions.forEach((option, rowIndex) => {
         const index = isBtr ? rowIndex + 1 : rowIndex;
         const row = document.createElement("tr");
+        const isRequiredReheatOption = isBtr && unit.reheatCoil === "HGR" && index === 1;
         row.innerHTML = `
-            <td><select data-option-select="${index}" aria-label="Selectable option ${rowIndex + 1}">
+            <td><select data-option-select="${index}" aria-label="Selectable option ${rowIndex + 1}" ${isRequiredReheatOption ? "disabled" : ""}>
                 <option value="">Select an option</option>
                 <option value="${deselectOptionValue}">Deselect option</option>
             </select></td>
-            <td><input data-option-quantity="${index}" type="number" min="1" step="1" value="${option.quantity}" aria-label="Option ${rowIndex + 1} quantity"></td>
+            <td><input data-option-quantity="${index}" type="number" min="1" step="1" value="${option.quantity}" aria-label="Option ${rowIndex + 1} quantity" ${isRequiredReheatOption ? "disabled" : ""}></td>
             <td data-option-uom="${index}">${isBtr ? "per Unit" : "—"}</td>
             <td data-option-list-price="${index}" class="option-price"></td>
             <td data-option-net-price="${index}" class="option-price">${formatCurrency(0)}</td>
@@ -1570,6 +1603,9 @@ exportQuoteButton.addEventListener("click", async () => {
                 unitNumber: Number(row.dataset.unitRow),
                 location: row.querySelector('[data-unit-field="location"]').value,
                 tag: row.querySelector('[data-unit-field="tag"]').value,
+                airUnitModelNumber: unit.productLine === "BTR"
+                    ? getBtrAirUnitModelNumber(unit)
+                    : unit.model,
                 baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
                 cellCount: getUnitCellCount(unit),
                 options: [
@@ -2079,6 +2115,8 @@ optionsPanel.addEventListener("input", event => {
 
     const quantity = Number(quantityInput.value);
     const index = Number(quantityInput.dataset.optionQuantity);
+    if (quotedUnits[activeUnitNumber].productLine === "BTR" &&
+        quotedUnits[activeUnitNumber].reheatCoil === "HGR" && index === 1) return;
     const isValid = Number.isInteger(quantity) && quantity >= 1;
     quantityInput.setCustomValidity(isValid ? "" : "Enter a quantity of at least 1.");
     if (!isValid) return;
@@ -2099,6 +2137,7 @@ optionsPanel.addEventListener("change", event => {
     if (select && Number.isInteger(activeUnitNumber) && quotedUnits[activeUnitNumber]) {
         const index = Number(select.dataset.optionSelect);
         const activeUnit = quotedUnits[activeUnitNumber];
+        if (activeUnit.productLine === "BTR" && activeUnit.reheatCoil === "HGR" && index === 1) return;
         const options = getUnitOptions(activeUnit);
         if (select.value === deselectOptionValue) {
             if (activeUnit.productLine === "BTR") {

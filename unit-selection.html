@@ -452,6 +452,12 @@
                         <option value="FL">FL-Flooded</option>
                         <option value="DX">DX-Direct Expansion</option>
                     </select>
+
+                    <label for="reheat-coil">Reheat Coil</label>
+                    <select id="reheat-coil">
+                        <option value="">None</option>
+                        <option value="HGR">HGR-Hot Gas Reheat</option>
+                    </select>
                 </section>
             </div>
 
@@ -988,10 +994,20 @@ function findBtrUnits() {
     const minimumDifference = Number(btrCapacityUnderInput.value);
     const maximumDifference = Number(btrCapacityOverInput.value);
     const maximumFaceVelocity = Number(roomTemperatureInput.value) > 34 ? 630 : Infinity;
+    const reheatCoil = document.getElementById("reheat-coil").value;
+    const hasReheat = reheatCoil === "HGR";
+    const hasUnsupportedReheatModels = hasReheat && availableUnits.some(unit => unit.model.endsWith("8"));
     const matches = availableUnits.flatMap(unit => {
         const coilCapacity = unit.capacities[materialGroup][capacityType];
         const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
-        const faceVelocity = unit.cfm / unit.coilFaceArea;
+        const reheatModel = hasReheat
+            ? unit.model.replace(/(\d)$/, (_, rows) => String(Number(rows) + 2))
+            : unit.model;
+        const physicalUnit = hasReheat
+            ? availableUnits.find(candidate => candidate.model === reheatModel)
+            : unit;
+        if (!physicalUnit) return [];
+        const faceVelocity = physicalUnit.cfm / physicalUnit.coilFaceArea;
         if (capacityDifference < minimumDifference || capacityDifference > maximumDifference ||
             faceVelocity > maximumFaceVelocity) {
             return [];
@@ -999,10 +1015,11 @@ function findBtrUnits() {
 
         return [{
             model: unit.model,
+            ...(hasReheat ? { reheatCoil, reheatModel } : {}),
             coilCapacity,
             capacityDifference,
             faceVelocity,
-            airFlowCfm: unit.cfm,
+            airFlowCfm: physicalUnit.cfm,
             listPrice: 1,
             fanHp: getBtrFanMotorHp(unit.fans)
         }];
@@ -1016,7 +1033,7 @@ function findBtrUnits() {
         row.tabIndex = 0;
         row.setAttribute("aria-selected", "false");
         const values = [
-            unit.model,
+            `${unit.model}${unit.reheatCoil === "HGR" ? "/2" : ""}`,
             formatBtrNumber(unit.coilCapacity, 0),
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
             formatBtrNumber(unit.faceVelocity, 0),
@@ -1031,8 +1048,8 @@ function findBtrUnits() {
         btrResultsRows.append(row);
     }
     btrResultsStatus.textContent = matches.length
-        ? `${matches.length} matching coil${matches.length === 1 ? "" : "s"} found.`
-        : "No coils match the selected capacity range.";
+        ? `${matches.length} matching coil${matches.length === 1 ? "" : "s"} found.${hasUnsupportedReheatModels ? " HGR is unavailable for 8-row coils because 10-row pricing and specifications are not available." : ""}`
+        : `No coils match the selected capacity range.${hasUnsupportedReheatModels ? " HGR is unavailable for 8-row coils because 10-row pricing and specifications are not available." : ""}`;
 }
 
 function selectBtrUnit(model) {
@@ -1154,7 +1171,7 @@ productLineSelect.addEventListener("change", () => {
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #btr-capacity-under, #btr-capacity-over")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -1164,7 +1181,7 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 input.dataset.populated = String(input.value.trim() !== "" && input.checkValidity());
                 updateBtrSelectionVisibility();
                 clearBtrResults();
-            } else if (input.matches("#btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed")) {
+            } else if (input.matches("#btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil")) {
                 updateBtrSelectionVisibility();
                 clearBtrResults();
             } else if (input.matches("#btr-capacity-under, #btr-capacity-over")) {
@@ -1388,6 +1405,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                 document.getElementById("coil-material").value = savedUnit.coilMaterial ?? "";
                 document.getElementById("defrost-type").value = savedUnit.defrostType ?? "";
                 document.getElementById("refrigerant-feed").value = savedUnit.refrigerantFeed ?? "";
+                document.getElementById("reheat-coil").value = savedUnit.reheatCoil ?? "";
                 btrCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
                 btrCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
                 updateBtrSelectionVisibility();

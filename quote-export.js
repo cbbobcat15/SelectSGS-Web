@@ -367,7 +367,7 @@
             lines.push({
                 type: "unit",
                 quantity: cellCount,
-                description: `Line Item #${unit.unitNumber}: Location: ${unit.location} | Model #: ${unit.model} | Cells: ${cellCount}`,
+                description: `Line Item #${unit.unitNumber}: Location: ${unit.location} | Model #: ${unit.airUnitModelNumber ?? unit.model} | Cells: ${cellCount}`,
                 netEach: basePrice,
                 extended: basePrice * cellCount
             });
@@ -436,7 +436,7 @@
         const fanHp = fanMotor ? Number(fanMotor[2]) : "N/A";
         const descriptionValues = [
             [30, "C", isDtc ? "DTC" : "IEC"], [30, "I", fansPerCell],
-            [31, "C", unit.model], [31, "I", fanHp],
+            [31, "C", unit.airUnitModelNumber ?? unit.model], [31, "I", fanHp],
             [32, "C", "N/A"], [32, "I", fanMotor ? fansPerCell * fanHp : "N/A"],
             [33, "C", "N/A"], [33, "I", isDtc ? Number(unit.fanMotor) : "N/A"],
             [34, "C", unit.motorVoltage], [34, "I", "N/A"],
