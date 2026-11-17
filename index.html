@@ -920,6 +920,9 @@ const writeInOptionRows = document.getElementById("write-in-option-rows");
 const optionLineCount = 12;
 const btrSelectableOptionLineCount = 6;
 const writeInOptionCount = 3;
+const btrNoCoverOptionId = "btr-drain-pan-no-cover";
+const btrInsulatedCoverOptionId = "btr-drain-pan-ss-cover";
+const btrHygienicCoverOptionId = "btr-drain-pan-ss-welded-hygienic";
 const hdgOptionId = "Internal_HDG_Plt";
 const legacyHdgOptionId = "hdg-internal-service-platform";
 const productPrices = window.selectSgsProductPricing?.models ?? {};
@@ -1249,16 +1252,40 @@ function getProductPricing(unit) {
         const basePrice = materialPricing?.basePrices?.[unit.defrostType];
         if (!materialPricing || !Number.isFinite(basePrice)) return null;
 
-        const defrostOptionTypes = {
-            FCPan_NoCover_WD: ["WD"],
-            FCPan_SS_Welded_IA_IHGC_IED: ["A", "HGC"],
-            inv_ready_mtr_WD: ["WD"]
-        };
+        const hygienicCoverPricing = materialPricing.options.find(option =>
+            option.id === "FCPan_SS_Welded_IA_IHGC_IED"
+        );
+        if (!hygienicCoverPricing) return null;
+        const includedInBase = ["HTS", "HTP", "HGS", "HGP"].includes(unit.defrostType);
+        const drainPanOptions = [
+            {
+                id: btrNoCoverOptionId,
+                label: "Full Coverage Drain Pan w/o Cover",
+                price: 0,
+                uom: "per Unit"
+            },
+            {
+                id: btrInsulatedCoverOptionId,
+                label: `Full Coverage Drain Pan w/ SS Insulated Cover${includedInBase ? " (included in base price)" : ""}`,
+                price: 0,
+                uom: "per Unit"
+            },
+            {
+                id: btrHygienicCoverOptionId,
+                label: "Full Coverage Drain Pan w/ Fully Welded SS Insulated Cover (Hygienic)",
+                price: hygienicCoverPricing.price,
+                uom: "per Unit"
+            }
+        ];
         return {
             basePrice,
-            options: materialPricing.options.filter(option =>
-                !defrostOptionTypes[option.id] || defrostOptionTypes[option.id].includes(unit.defrostType)
-            )
+            options: [
+                ...drainPanOptions,
+                ...materialPricing.options.filter(option =>
+                    (!option.id.startsWith("FCPan_") || option.id.includes("HeatTape")) &&
+                    (option.id !== "inv_ready_mtr_WD" || unit.defrostType === "WD")
+                )
+            ]
         };
     }
 
@@ -1294,7 +1321,17 @@ function getUnitOptions(unit) {
 
     unit.options = Array.from({ length: lineCount }, (_, index) => {
         const option = unit.options[index];
-        const optionId = option?.optionId === legacyHdgOptionId ? hdgOptionId : option?.optionId;
+        const btrOptionId = unit.productLine === "BTR"
+            ? ({
+                FCPan_NoCover_WD: btrNoCoverOptionId,
+                FCPan_SS_Riveted_HGP_HGS: btrInsulatedCoverOptionId,
+                FCPan_SS_Riveted_IA_IHGC_IED: btrInsulatedCoverOptionId,
+                FCPan_SS_Welded_HGP_HGS: btrHygienicCoverOptionId,
+                FCPan_SS_Welded_IA_IHGC_IED: btrHygienicCoverOptionId,
+                FCPan_SS_Welded_HGP_HGS_HTP_HTS: btrHygienicCoverOptionId
+            }[option?.optionId] ?? option?.optionId)
+            : option?.optionId;
+        const optionId = btrOptionId === legacyHdgOptionId ? hdgOptionId : btrOptionId;
         return {
             optionId: availableOptionIds.has(optionId) ? optionId : "",
             quantity: Number.isInteger(Number(option?.quantity)) && Number(option.quantity) >= 1
@@ -1314,13 +1351,18 @@ function getUnitOptions(unit) {
         if (drainPanIndex > 0) {
             [unit.options[0], unit.options[drainPanIndex]] = [unit.options[drainPanIndex], unit.options[0]];
         }
+        if (drainPanIndex === -1) unit.options[0].optionId = btrNoCoverOptionId;
     }
 
     return unit.options;
 }
 
 function isBtrDrainPanOptionId(optionId) {
-    return typeof optionId === "string" && optionId.startsWith("FCPan_") && !optionId.includes("HeatTape");
+    return [
+        btrNoCoverOptionId,
+        btrInsulatedCoverOptionId,
+        btrHygienicCoverOptionId
+    ].includes(optionId);
 }
 
 function getUnitWriteInOptions(unit) {
@@ -1361,7 +1403,6 @@ function renderOptionRows(options, unit) {
         row.innerHTML = `
             <td><select data-option-select="0" aria-label="Drain pan option">
                 <option value="">Select a drain pan option</option>
-                <option value="${deselectOptionValue}">Deselect option</option>
             </select></td>
             <td aria-hidden="true"></td>
             <td data-option-uom="0">per Unit</td>
