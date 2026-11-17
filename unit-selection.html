@@ -526,7 +526,7 @@
 
 <script src="dtc-units.js?v=20261111-1442"></script>
 <script src="iec-engineering-data.js?v=20261111-2008"></script>
-<script src="btr-ratings.js?v=20261117-1530"></script>
+<script src="btr-ratings.js?v=20261117-1624"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
 <script>
 
@@ -920,6 +920,11 @@ function formatBtrNumber(value, maximumFractionDigits = 2) {
     return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value);
 }
 
+function getBtrFanMotorHp(fanDescription) {
+    const horsepower = fanDescription.split("x").pop().trim().split("/").map(Number);
+    return horsepower[0] / (horsepower[1] ?? 1);
+}
+
 function formatCurrency(value) {
     return new Intl.NumberFormat(undefined, {
         style: "currency",
@@ -999,7 +1004,7 @@ function findBtrUnits() {
             faceVelocity,
             airFlowCfm: unit.cfm,
             listPrice: 1,
-            fanHp: unit.fans.split("x").pop().trim()
+            fanHp: getBtrFanMotorHp(unit.fans)
         }];
     });
 
@@ -1016,7 +1021,7 @@ function findBtrUnits() {
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
             formatBtrNumber(unit.faceVelocity, 0),
             formatCurrency(unit.listPrice),
-            `${unit.fanHp} HP`
+            `${formatBtrNumber(unit.fanHp)} HP`
         ];
         for (const value of values) {
             const cell = document.createElement("td");

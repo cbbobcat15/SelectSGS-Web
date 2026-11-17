@@ -415,12 +415,6 @@
             background: #d6d6d6;
         }
 
-        .unit-details.btr-unit-details {
-            padding: 12px;
-            border-left: 1px solid #8797a5;
-            background: #bdbdbd;
-        }
-
         .unit-details h2 {
             margin: 0 0 14px;
             color: #004f9f;
@@ -494,13 +488,6 @@
 
         .unit-specifications--btr dl {
             grid-template-columns: minmax(0, 1fr) minmax(72px, .9fr);
-        }
-
-        .unit-specifications--btr dd,
-        .unit-specifications--btr .unit-detail-model strong {
-            border-color: #a78e6a;
-            background: #dfb985;
-            color: #263746;
         }
 
         .unit-specifications--btr .unit-detail-model {
@@ -604,32 +591,17 @@
             font-variant-numeric: tabular-nums;
         }
 
-        .btr-options-panel {
-            background: #e1e1e1;
-        }
-
-        .btr-options-panel .option-table th {
-            background: #e7e7e7;
-            font-weight: normal;
-        }
-
-        .btr-options-panel .option-table [data-option-uom],
-        .btr-options-panel .option-table [data-option-list-price],
-        .btr-options-panel .option-table [data-option-net-price],
-        .btr-options-panel .option-table [data-write-in-uom],
-        .btr-options-panel .option-table [data-write-in-list-price],
-        .btr-options-panel .option-table [data-write-in-net-price] {
-            background: #dfb985;
+        .option-table [data-write-in-list-price] {
+            background: #eef5ff;
             color: #263746;
-            font-weight: normal;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
         }
 
-        .btr-options-panel .option-table [data-option-net-price],
-        .btr-options-panel .option-table [data-write-in-net-price] {
+        .option-table [data-write-in-net-price] {
+            background: #dceeff;
+            color: #003a75;
             font-weight: bold;
-        }
-
-        .btr-options-panel .option-table [data-write-in-list-price] {
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
@@ -884,7 +856,7 @@
             <div id="drain-pan-option" class="option-table-wrapper btr-option-section" hidden>
                 <table class="option-table">
                     <thead>
-                        <tr><th scope="col">Drain Pan Option</th><th scope="col">UOM</th><th scope="col">List</th><th scope="col">Net</th></tr>
+                        <tr><th scope="col">Drain Pan Option</th><th scope="col">Qty</th><th scope="col">UOM</th><th scope="col">List</th><th scope="col">Net</th></tr>
                     </thead>
                     <tbody id="drain-pan-row"></tbody>
                 </table>
@@ -913,7 +885,7 @@
 </div>
 <script src="product-pricing.js?v=20261111-1540"></script>
 <script src="iec-engineering-data.js?v=20261111-2016"></script>
-<script src="btr-ratings.js?v=20261117-1530"></script>
+<script src="btr-ratings.js?v=20261117-1624"></script>
 <script src="btr-product-pricing.js?v=20261117-1600"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
@@ -946,6 +918,7 @@ const drainPanRows = document.getElementById("drain-pan-row");
 const writeInOptionPanel = document.getElementById("write-in-options");
 const writeInOptionRows = document.getElementById("write-in-option-rows");
 const optionLineCount = 12;
+const btrSelectableOptionLineCount = 6;
 const writeInOptionCount = 3;
 const hdgOptionId = "Internal_HDG_Plt";
 const legacyHdgOptionId = "hdg-internal-service-platform";
@@ -969,17 +942,47 @@ function formatCurrency(value) {
     }).format(value);
 }
 
+function getBtrFanSpecifications(unit) {
+    const digits = unit.model?.match(/^BTR-(\d+)$/)?.[1];
+    if (!digits) return null;
+    const series = digits.length === 2 ? `${digits[0]}0` : digits.slice(0, 2);
+    if (["20", "30", "40", "50"].includes(series)) return { diameterIn: 18, speedRpm: 1100 };
+    if (["11", "21", "31", "41"].includes(series)) return { diameterIn: 30, speedRpm: 1140 };
+    return null;
+}
+
+function getBtrAirUnitModelNumber(unit) {
+    const materialCode = { "AL/AL": "A", "CU/AL": "C", "SS/AL": "B" }[unit.coilMaterial];
+    const refrigerantCode = { R717: "A" }[unit.refrigerant];
+    const defrostCode = { A: "IA", HGC: "IHGC", HTS: "HTS", HGS: "HGP", WD: "WD" }[unit.defrostType];
+    const coilModelDigits = unit.model?.match(/^BTR-(\d+)$/)?.[1];
+    if (!materialCode || !refrigerantCode || !defrostCode || !coilModelDigits || !unit.refrigerantFeed) {
+        return "Unavailable";
+    }
+
+    return `BTRD${materialCode}${coilModelDigits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}`;
+}
+
+function getBtrFanMotorHpValue(value) {
+    if (Number.isFinite(value)) return value;
+    if (typeof value !== "string") return null;
+    const fraction = value.trim().split("/").map(Number);
+    if (fraction.length === 1 && Number.isFinite(fraction[0])) return fraction[0];
+    if (fraction.length === 2 && fraction.every(Number.isFinite) && fraction[1] !== 0) {
+        return fraction[0] / fraction[1];
+    }
+    return null;
+}
+
 function renderUnitDetails(unitNumber) {
     activeUnitNumber = Number(unitNumber);
     const unit = quotedUnits[unitNumber];
-    const unitDetailsPanel = document.getElementById("unit-details");
     const unitRow = unitRows[unitNumber - 1];
     const details = document.getElementById("unit-details-list");
     const emptyMessage = document.getElementById("unit-details-empty");
     details.replaceChildren();
 
     if (!unit) {
-        unitDetailsPanel.classList.remove("btr-unit-details");
         details.hidden = true;
         emptyMessage.hidden = false;
         optionsPanel.hidden = true;
@@ -988,7 +991,6 @@ function renderUnitDetails(unitNumber) {
     }
 
     const isBtr = unit.productLine === "BTR";
-    unitDetailsPanel.classList.toggle("btr-unit-details", isBtr);
     details.classList.toggle("unit-specifications--btr", isBtr);
     const options = getUnitOptions(unit);
     renderOptionRows(options, unit);
@@ -997,24 +999,25 @@ function renderUnitDetails(unitNumber) {
     const physicalSpecs = isBtr ? window.selectSgsBtrPhysicalSpecs?.[unit.model] : null;
     const shippingWeight = physicalSpecs?.shippingWeightsLb?.[unit.coilMaterial];
     const dimensions = physicalSpecs?.dimensionsIn;
+    const fanSpecifications = isBtr ? getBtrFanSpecifications(unit) : null;
     const evaporatorCount = Number(unit.numberOfEvaporators);
     const tonsPerEvaporator = Number(unit.roomLoad) / evaporatorCount;
     const coolingRows = Number(unit.model?.slice(-1));
     const formatDimension = value => `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} in`;
+    const fanMotorHpValue = getBtrFanMotorHpValue(unit.fanHp);
+    const fanMotorHp = fanMotorHpValue !== null
+        ? `${fanMotorHpValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} HP`
+        : undefined;
     const primaryFields = isBtr ? [
         ["Number of AHU", unit.numberOfEvaporators],
         ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
         ["Req. tons per unit", Number.isFinite(tonsPerEvaporator) ? `${tonsPerEvaporator.toLocaleString()} TR` : undefined],
         ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
         ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
-        ["ESP", "N/A"],
-        ["Fan diameter", "N/A"],
-        ["Fan motor(s)", unit.fanHp == null ? undefined : `${unit.fanHp} HP`],
-        ["Coil tube diameter", "N/A"],
-        ["Refrigerant", unit.refrigerant],
-        ["Coil material", unit.coilMaterial],
-        ["Defrost type", unit.defrostType],
-        ["Refrigerant feed", unit.refrigerantFeed]
+        ["ESP", `0"`],
+        ["Fan diameter", fanSpecifications ? `${fanSpecifications.diameterIn}"` : undefined],
+        ["Fan motor(s)", fanMotorHp],
+        ["Coil tube diameter", `3/4"`]
     ] : [
         ["Product line", unit.productLine ?? "IEC"],
         ["# of cells", getUnitCellCount(unit)],
@@ -1029,13 +1032,17 @@ function renderUnitDetails(unitNumber) {
         ["Wet bulb temperature", `${unit.wetBulbTemperature} °F`]
     ];
     const secondaryFields = isBtr ? [
-        ["Motor speed", "N/A"],
+        ["Motor speed", fanSpecifications ? `${fanSpecifications.speedRpm} RPM` : undefined],
         ["Face velocity", unit.faceVelocity == null ? undefined : `${unit.faceVelocity.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
         ["Cooling rows deep", Number.isInteger(coolingRows) ? `${coolingRows} RD` : undefined],
-        ["Fins per inch", "N/A"],
-        ["Total surface", "N/A"],
+        ["Fins per inch", "4 FPI"],
+        ["Total surface", Number.isFinite(physicalSpecs?.totalSurfaceAreaSqFt)
+            ? `${physicalSpecs.totalSurfaceAreaSqFt.toLocaleString()} sq. ft.`
+            : undefined],
         ["Coil weight", Number.isFinite(shippingWeight) ? `${shippingWeight.toLocaleString()} lb` : undefined],
-        ["Air flow rate", unit.airFlowCfm == null ? undefined : `${unit.airFlowCfm.toLocaleString()} CFM`],
+        ["Air flow rate", Number.isFinite(unit.airFlowCfm ?? physicalSpecs?.airFlowCfm)
+            ? `${(unit.airFlowCfm ?? physicalSpecs.airFlowCfm).toLocaleString()} CFM`
+            : undefined],
         ["Length", dimensions ? formatDimension(dimensions.length) : undefined],
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
@@ -1075,6 +1082,7 @@ function renderUnitDetails(unitNumber) {
     }
     if (isBtr) {
         model.querySelector("span").textContent = "Air Unit Model Number";
+        modelValue.textContent = getBtrAirUnitModelNumber(unit);
         details.append(columns, model);
     } else {
         details.append(model, columns);
@@ -1193,7 +1201,7 @@ function getUnitLinePrice(unit) {
         if (!option.optionId) return sum;
         const pricing = getOptionPricing(unit, option.optionId);
         if (!pricing) return sum;
-        const optionCount = option.quantity * (pricing.uom === "per Cell" ? cellCount : 1);
+        const optionCount = option.quantity * (getOptionUom(unit, pricing) === "per Cell" ? cellCount : 1);
         return sum + optionCount * pricing.price * costMultiplier;
     }, 0);
     const writeInOptionNet = unit.productLine === "BTR"
@@ -1265,17 +1273,26 @@ function getOptionPricing(unit, optionId) {
     return getProductOptions(unit).find(option => option.id === optionId) ?? null;
 }
 
+function getOptionUom(unit, pricing) {
+    return unit.productLine === "BTR" ? "per Unit" : pricing?.uom ?? "—";
+}
+
+function getUnitOptionLineCount(unit) {
+    return unit.productLine === "BTR" ? btrSelectableOptionLineCount + 1 : optionLineCount;
+}
+
 function getUnitOptions(unit) {
     const availableOptions = getProductOptions(unit);
     const availableOptionIds = new Set(availableOptions.map(option => option.id));
+    const lineCount = getUnitOptionLineCount(unit);
     if (!Array.isArray(unit.options)) {
-        unit.options = Array.from({ length: optionLineCount }, (_, index) => ({
+        unit.options = Array.from({ length: lineCount }, (_, index) => ({
             optionId: "",
             quantity: 1
         }));
     }
 
-    unit.options = Array.from({ length: optionLineCount }, (_, index) => {
+    unit.options = Array.from({ length: lineCount }, (_, index) => {
         const option = unit.options[index];
         const optionId = option?.optionId === legacyHdgOptionId ? hdgOptionId : option?.optionId;
         return {
@@ -1332,7 +1349,6 @@ function renderOptionRows(options, unit) {
     optionRows.replaceChildren();
     drainPanRows.replaceChildren();
     const isBtr = unit.productLine === "BTR";
-    optionsPanel.classList.toggle("btr-options-panel", isBtr);
     drainPanOptionPanel.hidden = !isBtr;
     writeInOptionPanel.hidden = !isBtr;
     document.getElementById("options-heading").textContent = isBtr
@@ -1347,7 +1363,8 @@ function renderOptionRows(options, unit) {
                 <option value="">Select a drain pan option</option>
                 <option value="${deselectOptionValue}">Deselect option</option>
             </select></td>
-            <td data-option-uom="0"></td>
+            <td aria-hidden="true"></td>
+            <td data-option-uom="0">per Unit</td>
             <td data-option-list-price="0" class="option-price"></td>
             <td data-option-net-price="0" class="option-price">${formatCurrency(0)}</td>
         `;
@@ -1375,7 +1392,7 @@ function renderOptionRows(options, unit) {
                 <option value="${deselectOptionValue}">Deselect option</option>
             </select></td>
             <td><input data-option-quantity="${index}" type="number" min="1" step="1" value="${option.quantity}" aria-label="Option ${rowIndex + 1} quantity"></td>
-            <td data-option-uom="${index}"></td>
+            <td data-option-uom="${index}">${isBtr ? "per Unit" : "—"}</td>
             <td data-option-list-price="${index}" class="option-price"></td>
             <td data-option-net-price="${index}" class="option-price">${formatCurrency(0)}</td>
         `;
@@ -1466,8 +1483,9 @@ function updateQuotePrices() {
         if (!listPrice || !netPrice) continue;
         const optionPricing = option.optionId ? getOptionPricing(activeUnit, option.optionId) : null;
         const optionPrice = optionPricing?.price ?? 0;
-        if (uom) uom.textContent = optionPricing?.uom ?? "—";
-        const optionCount = option.quantity * (optionPricing?.uom === "per Cell" ? getUnitCellCount(activeUnit) : 1);
+        if (uom) uom.textContent = getOptionUom(activeUnit, optionPricing);
+        const optionCount = option.quantity *
+            (getOptionUom(activeUnit, optionPricing) === "per Cell" ? getUnitCellCount(activeUnit) : 1);
         listPrice.textContent = formatCurrency(optionPrice * optionCount);
         netPrice.textContent = formatCurrency(optionPrice * optionCount * costMultiplier);
     }
@@ -1510,7 +1528,8 @@ exportQuoteButton.addEventListener("click", async () => {
                             }
                             return {
                                 ...option,
-                                quantity: option.quantity * (optionPricing.uom === "per Cell" ? getUnitCellCount(unit) : 1),
+                                quantity: option.quantity *
+                                    (getOptionUom(unit, optionPricing) === "per Cell" ? getUnitCellCount(unit) : 1),
                                 optionId: optionPricing.label,
                                 netEachPrice: optionPricing.price * costMultiplier
                             };
@@ -2041,7 +2060,7 @@ optionsPanel.addEventListener("change", event => {
                         options.length,
                         options[0],
                         ...selectedOptions,
-                        ...Array.from({ length: optionLineCount - selectedOptions.length - 1 }, () => ({
+                        ...Array.from({ length: getUnitOptionLineCount(activeUnit) - selectedOptions.length - 1 }, () => ({
                             optionId: "",
                             quantity: 1
                         }))
@@ -2055,7 +2074,7 @@ optionsPanel.addEventListener("change", event => {
                     0,
                     options.length,
                     ...selectedOptions,
-                    ...Array.from({ length: optionLineCount - selectedOptions.length }, () => ({
+                    ...Array.from({ length: getUnitOptionLineCount(activeUnit) - selectedOptions.length }, () => ({
                         optionId: "",
                         quantity: 1
                     }))
@@ -2066,7 +2085,7 @@ optionsPanel.addEventListener("change", event => {
                 drainPanRows.querySelector('[data-option-select="0"]')?.focus();
             } else {
                 const focusIndex = activeUnit.productLine === "BTR"
-                    ? Math.min(index, optionLineCount - 1)
+                    ? Math.min(index, getUnitOptionLineCount(activeUnit) - 1)
                     : Math.min(index, options.length - 1);
                 optionRows.querySelector(`[data-option-select="${focusIndex}"]`)?.focus();
             }

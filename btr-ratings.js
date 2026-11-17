@@ -66,6 +66,17 @@ const btrDimensionsByPrefix = {
     4: { length: 182.625, width: 40.875, heights: { 4: 30.375, 6: 36.187, 8: 41 } }
 };
 
+const btrTotalSurfaceAreaSqFt = {
+    "BTR-24": 468, "BTR-26": 705, "BTR-28": 938,
+    "BTR-34": 703, "BTR-36": 1055, "BTR-38": 1408,
+    "BTR-44": 946, "BTR-46": 1422, "BTR-48": 1895,
+    "BTR-54": 1186, "BTR-56": 1780, "BTR-58": 2370,
+    "BTR-114": 508, "BTR-116": 762, "BTR-118": 1016,
+    "BTR-214": 1016, "BTR-216": 1524, "BTR-218": 2032,
+    "BTR-314": 1524, "BTR-316": 2286, "BTR-318": 3048,
+    "BTR-414": 2032, "BTR-416": 3048, "BTR-418": 4064
+};
+
 window.selectSgsBtrPhysicalSpecs = Object.fromEntries(window.selectSgsBtrRatings.map(unit => {
     const modelNumber = Number(unit.model.slice(4));
     const hasThreeDigitModel = modelNumber >= 100;
@@ -73,7 +84,9 @@ window.selectSgsBtrPhysicalSpecs = Object.fromEntries(window.selectSgsBtrRatings
     const dimensions = hasThreeDigitModel ? btrDimensionsByPrefix[series] : btrDimensionsBySeries[series];
     const coilRows = Number(unit.model.slice(-1));
     return [unit.model, {
+        airFlowCfm: unit.cfm,
         shippingWeightsLb: btrShippingWeightsLb[unit.model],
+        totalSurfaceAreaSqFt: btrTotalSurfaceAreaSqFt[unit.model],
         dimensionsIn: {
             length: dimensions.length,
             width: dimensions.width,
