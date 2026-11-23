@@ -143,6 +143,11 @@
             font-weight: bold;
         }
 
+        #stc-factor-warning {
+            color: #a12622;
+            font-weight: bold;
+        }
+
         .btr-results-table-wrapper {
             max-height: 420px;
             overflow: auto;
@@ -460,6 +465,27 @@
                         <option value="HGR">HGR-Hot Gas Reheat</option>
                     </select>
                 </section>
+
+                <section id="stc-selection-fields" aria-labelledby="stc-selection-heading" hidden>
+                    <h2 id="stc-selection-heading">STC Selection</h2>
+
+                    <label for="stc-coil-material">Coil Material</label>
+                    <select id="stc-coil-material" required>
+                        <option value="" selected disabled>Select coil material</option>
+                        <option value="SS">SS</option>
+                        <option value="AL">AL</option>
+                        <option value="CU">CU</option>
+                        <option value="HDG">Steel HDG</option>
+                    </select>
+
+                    <label for="stc-refrigerant-feed">R717 Refrigerant Feed</label>
+                    <select id="stc-refrigerant-feed" required>
+                        <option value="" selected disabled>Select refrigerant feed</option>
+                        <option value="RECIRC_FLOODED">Recirculated / Flooded</option>
+                        <option value="DX">Direct Expansion (DX to 0°F SST)</option>
+                    </select>
+                    <p id="stc-factor-warning" role="alert" hidden></p>
+                </section>
             </div>
 
             <section id="btr-derived-values" class="btr-derived-values" aria-labelledby="btr-derived-heading" hidden>
@@ -539,7 +565,7 @@
                 </div>
             </div>
         </div>
-        <p>Models without a rating for the selected condition are excluded. List pricing is not available yet.</p>
+        <p>When applicable, Wet (32°F SST), R717 DX (0°F SST), and Steel HDG (Recirculated / Flooded) corrections are multiplied into catalog capacity. Models without a rating for the selected condition are excluded. List pricing is not available yet.</p>
         <div class="btr-results-table-wrapper">
             <table class="btr-results-table">
                 <thead>
@@ -547,6 +573,7 @@
                         <th scope="col">Model</th>
                         <th scope="col">Coil Cap<br>BTUH/TD</th>
                         <th scope="col">Cap % Diff</th>
+                        <th scope="col">Correction Factor</th>
                         <th scope="col">Face Vel<br>(FPM)</th>
                         <th scope="col">Fan HP</th>
                     </tr>
@@ -570,7 +597,7 @@
 <script src="dtc-units.js?v=20261111-1442"></script>
 <script src="iec-engineering-data.js?v=20261111-2008"></script>
 <script src="btr-ratings.js?v=20261117-1624"></script>
-<script src="stc-ratings.js?v=20261123-1437"></script>
+<script src="stc-ratings.js?v=20261123-1506"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
 <script src="btr-product-pricing.js?v=20261117-1600"></script>
 <script>
@@ -877,6 +904,10 @@ const btrResultsRows = document.getElementById("btr-results-rows");
 const btrResultsStatus = document.getElementById("btr-results-status");
 const btrCapacityUnderInput = document.getElementById("btr-capacity-under");
 const btrCapacityOverInput = document.getElementById("btr-capacity-over");
+const stcSelectionFields = document.getElementById("stc-selection-fields");
+const stcCoilMaterialSelect = document.getElementById("stc-coil-material");
+const stcRefrigerantFeedSelect = document.getElementById("stc-refrigerant-feed");
+const stcFactorWarning = document.getElementById("stc-factor-warning");
 const stcResultsPanel = document.getElementById("stc-results-panel");
 const stcResultsRows = document.getElementById("stc-results-rows");
 const stcResultsStatus = document.getElementById("stc-results-status");
@@ -925,11 +956,20 @@ function updateBtrSelectionVisibility() {
     const designInputsPopulated = areBtrDesignInputsPopulated();
     const showAdditionalFields = ["BTR", "STC"].includes(activeProductLine) && designInputsPopulated;
     btrSelectionFields.hidden = activeProductLine !== "BTR" || !showAdditionalFields;
+    stcSelectionFields.hidden = activeProductLine !== "STC" || !showAdditionalFields;
     btrDerivedValues.hidden = !showAdditionalFields;
     const selectionsComplete = activeProductLine !== "BTR" ||
         [...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
+    const stcHdgDxUnsupported = activeProductLine === "STC" &&
+        stcCoilMaterialSelect.value === "HDG" && stcRefrigerantFeedSelect.value === "DX";
+    stcFactorWarning.textContent = stcHdgDxUnsupported
+        ? "No Steel HDG correction factor is provided for R717 DX; select Recirculated / Flooded."
+        : "";
+    stcFactorWarning.hidden = !stcHdgDxUnsupported;
+    const stcSelectionsComplete = [...stcSelectionFields.querySelectorAll("select")].every(input => input.checkValidity()) &&
+        !stcHdgDxUnsupported;
     btrResultsPanel.hidden = activeProductLine !== "BTR" || !showAdditionalFields || !selectionsComplete;
-    stcResultsPanel.hidden = activeProductLine !== "STC" || !showAdditionalFields;
+    stcResultsPanel.hidden = activeProductLine !== "STC" || !showAdditionalFields || !stcSelectionsComplete;
     if (!showAdditionalFields) return;
 
     const roomTemperature = Number(roomTemperatureInput.value);
@@ -943,7 +983,6 @@ function updateBtrSelectionVisibility() {
     document.getElementById("target-capacity-per-coil").textContent = targetTd > 0
         ? formatBtrNumber(Number(roomLoadInput.value) * 12000 / targetTd / Number(numberOfEvaporatorsInput.value))
         : "N/A";
-
 }
 
 function clearBtrResults() {
@@ -1095,6 +1134,14 @@ function findBtrUnits() {
         }];
     });
 
+    if (missingCorrectionModels.size) {
+        stcMatchingUnits = [];
+        stcResultsStatus.textContent =
+            `STC correction factors are missing for ${[...missingCorrectionModels].join(", ")}. Refresh the rating data.`;
+        console.error("STC correction factors are missing.", [...missingCorrectionModels]);
+        return;
+    }
+
     btrMatchingUnits = matches;
     btrResultsRows.replaceChildren();
     for (const unit of matches) {
@@ -1153,6 +1200,20 @@ function findStcUnits() {
         return;
     }
 
+    const invalidSelectionInput = [stcCoilMaterialSelect, stcRefrigerantFeedSelect].find(input =>
+        !input.checkValidity()
+    );
+    if (invalidSelectionInput) {
+        invalidSelectionInput.reportValidity();
+        stcResultsStatus.textContent = "Choose an STC coil material and R717 refrigerant feed.";
+        return;
+    }
+    if (stcCoilMaterialSelect.value === "HDG" && stcRefrigerantFeedSelect.value === "DX") {
+        stcResultsStatus.textContent =
+            "No Steel HDG correction factor is provided for R717 DX; select Recirculated / Flooded.";
+        return;
+    }
+
     const invalidFilterInput = [stcCapacityUnderInput, stcCapacityOverInput].find(input =>
         !input.checkValidity() || input.value.trim() === ""
     );
@@ -1174,6 +1235,8 @@ function findStcUnits() {
     const targetCoilTemperature = Number(roomTemperatureInput.value) - targetTd;
     const coilRatingCondition = targetCoilTemperature > 25 ? "WET" : "Frosted";
     const capacityKey = coilRatingCondition === "WET" ? "wetCapacityBtuhPerTd" : "frostedCapacityBtuhPerTd";
+    const coilMaterial = stcCoilMaterialSelect.value;
+    const refrigerantFeed = stcRefrigerantFeedSelect.value;
     const minimumDifference = Number(stcCapacityUnderInput.value);
     const maximumDifference = Number(stcCapacityOverInput.value);
     const maximumFaceVelocity = Number(roomTemperatureInput.value) > 34 ? 630 : Infinity;
@@ -1183,10 +1246,50 @@ function findStcUnits() {
         console.error("STC rating data could not be loaded.");
         return;
     }
+    const capacityCorrections = window.selectSgsStcCapacityCorrections;
+    if (!capacityCorrections || !Array.isArray(capacityCorrections.applicableFinsPerInch)) {
+        stcResultsStatus.textContent = "STC capacity correction data could not be loaded. Refresh the page and try again.";
+        console.error("STC capacity correction data could not be loaded.");
+        return;
+    }
 
+    const missingCorrectionModels = new Set();
     stcMatchingUnits = availableUnits.flatMap(unit => {
-        const coilCapacity = unit[capacityKey];
-        if (!Number.isFinite(coilCapacity)) return [];
+        const catalogCoilCapacity = unit[capacityKey];
+        if (!Number.isFinite(catalogCoilCapacity)) return [];
+        const rowCount = Number(unit.rowsDeep);
+        const finsPerInch = Number(unit.finsPerInch);
+        if (!capacityCorrections.applicableFinsPerInch.includes(finsPerInch)) {
+            missingCorrectionModels.add(`${unit.model} (${finsPerInch} FPI)`);
+            return [];
+        }
+        const appliedCapacityCorrections = [];
+        const addCorrection = (label, factorsByRows) => {
+            const factor = factorsByRows?.[rowCount];
+            if (!Number.isFinite(factor)) return false;
+            appliedCapacityCorrections.push({ label, factor });
+            return true;
+        };
+        if (coilRatingCondition === "WET" &&
+            !addCorrection("Wet coil to 32°F SST", capacityCorrections.wetCoilTo32FSst)) {
+            missingCorrectionModels.add(`${unit.model} (${rowCount} rows, Wet)`);
+            return [];
+        }
+        if (refrigerantFeed === "DX" &&
+            !addCorrection("R717 Ammonia (NHS) DX to 0°F SST", capacityCorrections.r717AmmoniaDxTo0FSst)) {
+            missingCorrectionModels.add(`${unit.model} (${rowCount} rows, R717 DX)`);
+            return [];
+        }
+        if (coilMaterial === "HDG" &&
+            !addCorrection("Steel HDG Recirculated / Flooded", capacityCorrections.steelHdgRecirculatedFlooded)) {
+            missingCorrectionModels.add(`${unit.model} (${rowCount} rows, Steel HDG)`);
+            return [];
+        }
+        const capacityCorrectionFactor = appliedCapacityCorrections.reduce(
+            (combinedFactor, correction) => combinedFactor * correction.factor,
+            1
+        );
+        const coilCapacity = catalogCoilCapacity * capacityCorrectionFactor;
         const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
         if (capacityDifference < minimumDifference || capacityDifference > maximumDifference ||
             unit.faceVelocityFpm > maximumFaceVelocity) {
@@ -1194,7 +1297,12 @@ function findStcUnits() {
         }
         return [{
             ...unit,
+            coilMaterial,
+            refrigerantFeed,
             coilCapacity,
+            catalogCoilCapacity,
+            capacityCorrectionFactor,
+            appliedCapacityCorrections,
             capacityDifference,
             coilRatingCondition,
             faceVelocity: unit.faceVelocityFpm
@@ -1210,6 +1318,7 @@ function findStcUnits() {
             unit.model,
             formatBtrNumber(unit.coilCapacity, 0),
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
+            `${formatBtrNumber(unit.capacityCorrectionFactor, 3)}×`,
             formatBtrNumber(unit.faceVelocity, 0),
             unit.fanHp
         ];
@@ -1360,7 +1469,7 @@ productLineSelect.addEventListener("change", () => {
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-capacity-under, #stc-capacity-over")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-coil-material, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -1376,6 +1485,9 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 clearBtrResults();
             } else if (input.matches("#btr-capacity-under, #btr-capacity-over")) {
                 clearBtrResults();
+            } else if (input.matches("#stc-coil-material, #stc-refrigerant-feed")) {
+                updateBtrSelectionVisibility();
+                clearStcResults();
             } else if (input.matches("#stc-capacity-under, #stc-capacity-over")) {
                 clearStcResults();
             }
@@ -1649,6 +1761,8 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                         selectBtrUnit(savedUnit.model);
                     }
                 } else {
+                    stcCoilMaterialSelect.value = savedUnit.coilMaterial ?? "SS";
+                    stcRefrigerantFeedSelect.value = savedUnit.refrigerantFeed ?? "RECIRC_FLOODED";
                     stcCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
                     stcCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
                     updateBtrSelectionVisibility();

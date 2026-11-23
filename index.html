@@ -1045,8 +1045,19 @@ function renderUnitDetails(unitNumber) {
     ] : isStc ? [
         ["Product line", "STC Evaporator"],
         ["Number of AHU", unit.numberOfEvaporators],
-        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
-        ["Req. capacity per coil", unit.targetCapacity == null ? undefined : `${unit.targetCapacity.toLocaleString()} BTUH/TD`],
+        ["Coil material", { SS: "SS", AL: "AL", CU: "CU", HDG: "Steel HDG" }[unit.coilMaterial]],
+        ["R717 feed", unit.refrigerantFeed === "DX" ? "Direct Expansion (DX to 0°F SST)" : "Recirculated / Flooded"],
+        ["Catalog capacity", (unit.catalogCoilCapacity ?? unit.coilCapacity) == null
+            ? undefined
+            : `${(unit.catalogCoilCapacity ?? unit.coilCapacity).toLocaleString()} BTUH/TD`],
+        ["Corrected capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
+        ["Required capacity per coil", unit.targetCapacity == null ? undefined : `${unit.targetCapacity.toLocaleString()} BTUH/TD`],
+        ["Capacity correction factor", unit.capacityCorrectionFactor == null ? undefined : `×${unit.capacityCorrectionFactor.toLocaleString(undefined, { maximumFractionDigits: 3 })}`],
+        ["Applied corrections", Array.isArray(unit.appliedCapacityCorrections)
+            ? unit.appliedCapacityCorrections.map(correction =>
+                `${correction.label} (×${correction.factor})`
+            ).join(" × ") || "None"
+            : "Not recorded"],
         ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
         ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
         ["Rating condition", unit.coilRatingCondition],

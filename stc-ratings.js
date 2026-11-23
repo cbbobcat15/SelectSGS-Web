@@ -1,4 +1,11 @@
-// STC ratings transcribed from the STC Engineering Data worksheet; blank source ratings are null.
+// STC ratings and correction factors transcribed from the supplied engineering workbooks.
+window.selectSgsStcCapacityCorrections = {
+    applicableFinsPerInch: [3, 4, 6],
+    wetCoilTo32FSst: { 4: 1.13, 6: 1.12, 8: 1.10 },
+    r717AmmoniaDxTo0FSst: { 4: 0.75, 6: 0.83, 8: 0.84 },
+    steelHdgRecirculatedFlooded: { 4: 0.87, 6: 0.88, 8: 0.90 }
+};
+
 window.selectSgsStcRatings = [
     {"model":"STC1-43-AA","fanDiameterIn":24.0,"wetCapacityBtuhPerTd":1921.0,"frostedCapacityBtuhPerTd":1715.0,"fanHp":"1 x 1/3","motorRpm":1140.0,"rowsDeep":4.0,"finsPerInch":3.0,"faceAreaSqFt":7.1,"coilVolumeFt3":1.3,"surfaceAreaSqFt":340.0,"airFlowCfm":3900.0,"faceVelocityFpm":551.0,"shippingWeightLb":580.0},
     {"model":"STC1-63-AA","fanDiameterIn":24.0,"wetCapacityBtuhPerTd":2618.0,"frostedCapacityBtuhPerTd":2338.0,"fanHp":"1 x 1/3","motorRpm":1140.0,"rowsDeep":6.0,"finsPerInch":3.0,"faceAreaSqFt":7.1,"coilVolumeFt3":1.5,"surfaceAreaSqFt":510.0,"airFlowCfm":3700.0,"faceVelocityFpm":522.0,"shippingWeightLb":650.0},
