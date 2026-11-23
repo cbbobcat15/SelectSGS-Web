@@ -369,6 +369,7 @@
         <option value="IEC">IEC</option>
         <option value="DTC">DTC</option>
         <option value="BTR">BTR Evaporator</option>
+        <option value="STC">STC Evaporator</option>
     </select>
 
     <div id="condenser-inputs">
@@ -520,6 +521,42 @@
         <p id="btr-results-status" role="status">Click Find Units to search matching coils.</p>
     </section>
 
+    <section id="stc-results-panel" class="btr-results-panel" aria-labelledby="stc-results-heading" hidden>
+        <div class="btr-results-heading-row">
+            <h2 id="stc-results-heading">4. Select Unit</h2>
+            <h3>Filters</h3>
+        </div>
+        <div class="btr-results-toolbar">
+            <button id="stc-find-units" type="button">Find Units</button>
+            <div class="btr-result-filters">
+                <div class="btr-result-filter">
+                    <label for="stc-capacity-under">Cap % Under</label>
+                    <input id="stc-capacity-under" type="number" min="-100" max="0" step="any" value="-15" required>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="stc-capacity-over">Cap % Over</label>
+                    <input id="stc-capacity-over" type="number" min="0" step="any" value="15" required>
+                </div>
+            </div>
+        </div>
+        <p>Models without a rating for the selected condition are excluded. List pricing is not available yet.</p>
+        <div class="btr-results-table-wrapper">
+            <table class="btr-results-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Model</th>
+                        <th scope="col">Coil Cap<br>BTUH/TD</th>
+                        <th scope="col">Cap % Diff</th>
+                        <th scope="col">Face Vel<br>(FPM)</th>
+                        <th scope="col">Fan HP</th>
+                    </tr>
+                </thead>
+                <tbody id="stc-results-rows"></tbody>
+            </table>
+        </div>
+        <p id="stc-results-status" role="status">Click Find Units to search matching coils.</p>
+    </section>
+
     <div id="unit-selection-actions" class="action-bar">
         <button id="find-unit" type="button" onclick="findUnit()">Find Unit</button>
         <button id="add-to-quote" type="button" disabled>Add to Quote</button>
@@ -533,6 +570,7 @@
 <script src="dtc-units.js?v=20261111-1442"></script>
 <script src="iec-engineering-data.js?v=20261111-2008"></script>
 <script src="btr-ratings.js?v=20261117-1624"></script>
+<script src="stc-ratings.js?v=20261123-1437"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
 <script src="btr-product-pricing.js?v=20261117-1600"></script>
 <script>
@@ -822,6 +860,8 @@ let selectedUnitModel = null;
 let selectedCellCount = null;
 let btrMatchingUnits = [];
 let selectedBtrUnitModel = null;
+let stcMatchingUnits = [];
+let selectedStcUnitModel = null;
 let activeProductLine = "IEC";
 const quoteUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
 const productLineSelect = document.getElementById("product-line");
@@ -837,6 +877,11 @@ const btrResultsRows = document.getElementById("btr-results-rows");
 const btrResultsStatus = document.getElementById("btr-results-status");
 const btrCapacityUnderInput = document.getElementById("btr-capacity-under");
 const btrCapacityOverInput = document.getElementById("btr-capacity-over");
+const stcResultsPanel = document.getElementById("stc-results-panel");
+const stcResultsRows = document.getElementById("stc-results-rows");
+const stcResultsStatus = document.getElementById("stc-results-status");
+const stcCapacityUnderInput = document.getElementById("stc-capacity-under");
+const stcCapacityOverInput = document.getElementById("stc-capacity-over");
 const unitSelectionActions = document.getElementById("unit-selection-actions");
 const findUnitButton = document.getElementById("find-unit");
 const addToQuoteButton = document.getElementById("add-to-quote");
@@ -878,11 +923,13 @@ function areBtrDesignInputsPopulated() {
 
 function updateBtrSelectionVisibility() {
     const designInputsPopulated = areBtrDesignInputsPopulated();
-    const showAdditionalFields = activeProductLine === "BTR" && designInputsPopulated;
-    btrSelectionFields.hidden = !showAdditionalFields;
+    const showAdditionalFields = ["BTR", "STC"].includes(activeProductLine) && designInputsPopulated;
+    btrSelectionFields.hidden = activeProductLine !== "BTR" || !showAdditionalFields;
     btrDerivedValues.hidden = !showAdditionalFields;
-    const selectionsComplete = [...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
-    btrResultsPanel.hidden = !showAdditionalFields || !selectionsComplete;
+    const selectionsComplete = activeProductLine !== "BTR" ||
+        [...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
+    btrResultsPanel.hidden = activeProductLine !== "BTR" || !showAdditionalFields || !selectionsComplete;
+    stcResultsPanel.hidden = activeProductLine !== "STC" || !showAdditionalFields;
     if (!showAdditionalFields) return;
 
     const roomTemperature = Number(roomTemperatureInput.value);
@@ -897,7 +944,6 @@ function updateBtrSelectionVisibility() {
         ? formatBtrNumber(Number(roomLoadInput.value) * 12000 / targetTd / Number(numberOfEvaporatorsInput.value))
         : "N/A";
 
-    btrResultsPanel.hidden = ![...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
 }
 
 function clearBtrResults() {
@@ -908,16 +954,25 @@ function clearBtrResults() {
     addToQuoteButton.disabled = true;
 }
 
+function clearStcResults() {
+    stcMatchingUnits = [];
+    selectedStcUnitModel = null;
+    stcResultsRows.replaceChildren();
+    stcResultsStatus.textContent = "Click Find Units to refresh the results.";
+    addToQuoteButton.disabled = true;
+}
+
 function setProductLine(productLine) {
-    activeProductLine = ["IEC", "DTC", "BTR"].includes(productLine) ? productLine : "IEC";
+    activeProductLine = ["IEC", "DTC", "BTR", "STC"].includes(productLine) ? productLine : "IEC";
     productLineSelect.value = activeProductLine;
-    const isBtr = activeProductLine === "BTR";
-    condenserInputs.hidden = isBtr;
-    btrInputs.hidden = !isBtr;
+    const isEvaporator = activeProductLine === "BTR" || activeProductLine === "STC";
+    condenserInputs.hidden = isEvaporator;
+    btrInputs.hidden = !isEvaporator;
     btrResultsPanel.hidden = true;
+    stcResultsPanel.hidden = true;
     unitSelectionActions.hidden = false;
-    findUnitButton.hidden = isBtr;
-    document.getElementById("result").hidden = isBtr;
+    findUnitButton.hidden = isEvaporator;
+    document.getElementById("result").hidden = isEvaporator;
     updateBtrSelectionVisibility();
     r22Option.disabled = activeProductLine !== "IEC";
     if (activeProductLine !== "IEC") refrigerantSelect.value = "R717";
@@ -1082,6 +1137,104 @@ function selectBtrUnit(model) {
         quoteUnitNumber < 1 || quoteUnitNumber > 8;
 }
 
+function findStcUnits() {
+    stcMatchingUnits = [];
+    selectedStcUnitModel = null;
+    addToQuoteButton.disabled = true;
+    stcResultsRows.replaceChildren();
+    const invalidDesignInput = btrDesignInputs.find(input => !input.checkValidity());
+    if (invalidDesignInput) {
+        invalidDesignInput.reportValidity();
+        stcResultsStatus.textContent = "Enter valid values for all four STC design inputs.";
+        return;
+    }
+    if (!areBtrDesignInputsPopulated()) {
+        stcResultsStatus.textContent = "Enter Room Load and Target TD to search for STC units.";
+        return;
+    }
+
+    const invalidFilterInput = [stcCapacityUnderInput, stcCapacityOverInput].find(input =>
+        !input.checkValidity() || input.value.trim() === ""
+    );
+    if (invalidFilterInput) {
+        invalidFilterInput.reportValidity();
+        stcResultsStatus.textContent = "Enter valid capacity tolerance filters.";
+        return;
+    }
+
+    const roomLoad = Number(roomLoadInput.value);
+    const targetTd = Number(targetTdInput.value);
+    const evaporatorCount = Number(numberOfEvaporatorsInput.value);
+    const targetCapacity = roomLoad * 12000 / targetTd / evaporatorCount;
+    if (!Number.isFinite(targetCapacity) || targetCapacity <= 0) {
+        stcResultsStatus.textContent = "Enter a Room Load and Target TD that produce a positive target capacity per coil.";
+        return;
+    }
+
+    const targetCoilTemperature = Number(roomTemperatureInput.value) - targetTd;
+    const coilRatingCondition = targetCoilTemperature > 25 ? "WET" : "Frosted";
+    const capacityKey = coilRatingCondition === "WET" ? "wetCapacityBtuhPerTd" : "frostedCapacityBtuhPerTd";
+    const minimumDifference = Number(stcCapacityUnderInput.value);
+    const maximumDifference = Number(stcCapacityOverInput.value);
+    const maximumFaceVelocity = Number(roomTemperatureInput.value) > 34 ? 630 : Infinity;
+    const availableUnits = window.selectSgsStcRatings;
+    if (!Array.isArray(availableUnits) || availableUnits.length === 0) {
+        stcResultsStatus.textContent = "STC rating data could not be loaded. Refresh the page and try again.";
+        console.error("STC rating data could not be loaded.");
+        return;
+    }
+
+    stcMatchingUnits = availableUnits.flatMap(unit => {
+        const coilCapacity = unit[capacityKey];
+        if (!Number.isFinite(coilCapacity)) return [];
+        const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
+        if (capacityDifference < minimumDifference || capacityDifference > maximumDifference ||
+            unit.faceVelocityFpm > maximumFaceVelocity) {
+            return [];
+        }
+        return [{
+            ...unit,
+            coilCapacity,
+            capacityDifference,
+            coilRatingCondition,
+            faceVelocity: unit.faceVelocityFpm
+        }];
+    });
+
+    for (const unit of stcMatchingUnits) {
+        const row = document.createElement("tr");
+        row.dataset.unitModel = unit.model;
+        row.tabIndex = 0;
+        row.setAttribute("aria-selected", "false");
+        const values = [
+            unit.model,
+            formatBtrNumber(unit.coilCapacity, 0),
+            `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
+            formatBtrNumber(unit.faceVelocity, 0),
+            unit.fanHp
+        ];
+        for (const value of values) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.append(cell);
+        }
+        stcResultsRows.append(row);
+    }
+    stcResultsStatus.textContent = stcMatchingUnits.length
+        ? `${stcMatchingUnits.length} matching STC coil${stcMatchingUnits.length === 1 ? "" : "s"} found. Models without a listed ${coilRatingCondition} rating are excluded.`
+        : `No STC coils match the selected capacity range and ${coilRatingCondition} rating condition.`;
+}
+
+function selectStcUnit(model) {
+    if (!stcMatchingUnits.some(unit => unit.model === model)) return;
+    selectedStcUnitModel = model;
+    for (const row of stcResultsRows.rows) {
+        row.setAttribute("aria-selected", String(row.dataset.unitModel === model));
+    }
+    addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
+        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+}
+
 btrResultsRows.addEventListener("click", event => {
     const row = event.target.closest("tr[data-unit-model]");
     if (row) selectBtrUnit(row.dataset.unitModel);
@@ -1092,6 +1245,19 @@ btrResultsRows.addEventListener("keydown", event => {
         event.target.matches("tr[data-unit-model]")) {
         event.preventDefault();
         selectBtrUnit(event.target.dataset.unitModel);
+    }
+});
+
+stcResultsRows.addEventListener("click", event => {
+    const row = event.target.closest("tr[data-unit-model]");
+    if (row) selectStcUnit(row.dataset.unitModel);
+});
+
+stcResultsRows.addEventListener("keydown", event => {
+    if ((event.key === "Enter" || event.key === " ") &&
+        event.target.matches("tr[data-unit-model]")) {
+        event.preventDefault();
+        selectStcUnit(event.target.dataset.unitModel);
     }
 });
 
@@ -1178,6 +1344,7 @@ document.getElementById("result").addEventListener("keydown", event => {
 productLineSelect.addEventListener("change", () => {
     setProductLine(productLineSelect.value);
     clearBtrResults();
+    clearStcResults();
     selectedUnitModel = null;
     selectedCellCount = null;
     matchingUnits = [];
@@ -1188,10 +1355,12 @@ productLineSelect.addEventListener("change", () => {
     document.getElementById("result").textContent =
         activeProductLine === "BTR"
             ? "Enter the BTR design conditions and click Find Unit."
+            : activeProductLine === "STC"
+            ? "Enter the STC design conditions and click Find Units."
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-capacity-under, #stc-capacity-over")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -1201,11 +1370,14 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 input.dataset.populated = String(input.value.trim() !== "" && input.checkValidity());
                 updateBtrSelectionVisibility();
                 clearBtrResults();
+                clearStcResults();
             } else if (input.matches("#btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil")) {
                 updateBtrSelectionVisibility();
                 clearBtrResults();
             } else if (input.matches("#btr-capacity-under, #btr-capacity-over")) {
                 clearBtrResults();
+            } else if (input.matches("#stc-capacity-under, #stc-capacity-over")) {
+                clearStcResults();
             }
             if (!selectedUnitModel) return;
             selectedUnitModel = null;
@@ -1216,6 +1388,7 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
 }
 
 document.getElementById("btr-find-units").addEventListener("click", findBtrUnits);
+document.getElementById("stc-find-units").addEventListener("click", findStcUnits);
 
 function selectMatchingUnit(model, cellCount) {
     selectedUnitModel = model;
@@ -1224,6 +1397,42 @@ function selectMatchingUnit(model, cellCount) {
 }
 
 document.getElementById("add-to-quote").addEventListener("click", () => {
+    if (activeProductLine === "STC") {
+        const selectedUnit = stcMatchingUnits.find(unit => unit.model === selectedStcUnitModel);
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+            return;
+        }
+
+        try {
+            const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
+            const unitRows = JSON.parse(sessionStorage.getItem("selectsgs-unit-rows") || "[]");
+            const unitRow = unitRows[quoteUnitNumber - 1] || {};
+            const roomTemperature = Number(roomTemperatureInput.value);
+            const targetTd = Number(targetTdInput.value);
+            savedUnits[quoteUnitNumber] = {
+                ...selectedUnit,
+                productLine: "STC",
+                cellCount: 1,
+                roomLoad: Number(roomLoadInput.value),
+                numberOfEvaporators: Number(numberOfEvaporatorsInput.value),
+                roomTemperature,
+                targetTd,
+                targetCapacity: Number(roomLoadInput.value) * 12000 / targetTd / Number(numberOfEvaporatorsInput.value),
+                targetCoilTemperature: roomTemperature - targetTd,
+                capacityUnder: Number(stcCapacityUnderInput.value),
+                capacityOver: Number(stcCapacityOverInput.value),
+                location: unitRow.location || "",
+                tag: unitRow.tag || ""
+            };
+            sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(savedUnits));
+            window.location.href = `index.html?unit=${quoteUnitNumber}&added=1`;
+        } catch (error) {
+            stcResultsStatus.textContent = "The selected STC unit could not be added to the quote. Check your browser storage settings and try again.";
+            console.error("Could not save selected STC unit to quote.", error);
+        }
+        return;
+    }
+
     if (activeProductLine === "BTR") {
         const selectedUnit = btrMatchingUnits.find(unit => unit.model === selectedBtrUnitModel);
         if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
@@ -1325,6 +1534,10 @@ function findUnit() {
         findBtrUnits();
         return;
     }
+    if (activeProductLine === "STC") {
+        findStcUnits();
+        return;
+    }
 
     const capacity = Number(document.getElementById("Capacity").value);
     const maxCellCount = Number(document.getElementById("max-cells").value);
@@ -1409,7 +1622,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
         const savedUnit = savedUnits[quoteUnitNumber];
         if (savedUnit) {
             setProductLine(savedUnit.productLine);
-            if (savedUnit.productLine === "BTR") {
+            if (savedUnit.productLine === "BTR" || savedUnit.productLine === "STC") {
                 roomLoadInput.value = String(savedUnit.roomLoad ?? "");
                 numberOfEvaporatorsInput.value = String(savedUnit.numberOfEvaporators ?? 1);
                 roomTemperatureInput.value = String(savedUnit.roomTemperature ?? 0);
@@ -1421,17 +1634,28 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                         input.value.trim() !== "" && input.checkValidity()
                     );
                 }
-                document.getElementById("btr-refrigerant").value = savedUnit.refrigerant ?? "R717";
-                document.getElementById("coil-material").value = savedUnit.coilMaterial ?? "";
-                document.getElementById("defrost-type").value = savedUnit.defrostType ?? "";
-                document.getElementById("refrigerant-feed").value = savedUnit.refrigerantFeed ?? "";
-                document.getElementById("reheat-coil").value = savedUnit.reheatCoil ?? "";
-                btrCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
-                btrCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
                 updateBtrSelectionVisibility();
-                findBtrUnits();
-                if (btrMatchingUnits.some(unit => unit.model === savedUnit.model)) {
-                    selectBtrUnit(savedUnit.model);
+                if (savedUnit.productLine === "BTR") {
+                    document.getElementById("btr-refrigerant").value = savedUnit.refrigerant ?? "R717";
+                    document.getElementById("coil-material").value = savedUnit.coilMaterial ?? "";
+                    document.getElementById("defrost-type").value = savedUnit.defrostType ?? "";
+                    document.getElementById("refrigerant-feed").value = savedUnit.refrigerantFeed ?? "";
+                    document.getElementById("reheat-coil").value = savedUnit.reheatCoil ?? "";
+                    btrCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
+                    btrCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
+                    updateBtrSelectionVisibility();
+                    findBtrUnits();
+                    if (btrMatchingUnits.some(unit => unit.model === savedUnit.model)) {
+                        selectBtrUnit(savedUnit.model);
+                    }
+                } else {
+                    stcCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
+                    stcCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
+                    updateBtrSelectionVisibility();
+                    findStcUnits();
+                    if (stcMatchingUnits.some(unit => unit.model === savedUnit.model)) {
+                        selectStcUnit(savedUnit.model);
+                    }
                 }
             } else {
                 document.getElementById("Capacity").value = String(savedUnit.requiredCapacity ?? "");

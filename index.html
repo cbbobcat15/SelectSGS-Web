@@ -1012,10 +1012,11 @@ function renderUnitDetails(unitNumber) {
     }
 
     const isBtr = unit.productLine === "BTR";
+    const isStc = unit.productLine === "STC";
     details.classList.toggle("unit-specifications--btr", isBtr);
     const options = getUnitOptions(unit);
     renderOptionRows(options, unit);
-    optionsPanel.hidden = false;
+    optionsPanel.hidden = isStc;
 
     const physicalSpecs = isBtr
         ? window.selectSgsBtrPhysicalSpecs?.[getBtrPhysicalModel(unit)]
@@ -1041,6 +1042,15 @@ function renderUnitDetails(unitNumber) {
         ["Fan diameter", fanSpecifications ? `${fanSpecifications.diameterIn}"` : undefined],
         ["Fan motor(s)", fanMotorHp],
         ["Coil tube diameter", `3/4"`]
+    ] : isStc ? [
+        ["Product line", "STC Evaporator"],
+        ["Number of AHU", unit.numberOfEvaporators],
+        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
+        ["Req. capacity per coil", unit.targetCapacity == null ? undefined : `${unit.targetCapacity.toLocaleString()} BTUH/TD`],
+        ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
+        ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
+        ["Rating condition", unit.coilRatingCondition],
+        ["Target coil temp", unit.targetCoilTemperature == null ? undefined : `${unit.targetCoilTemperature} °F`]
     ] : [
         ["Product line", unit.productLine ?? "IEC"],
         ["# of cells", getUnitCellCount(unit)],
@@ -1069,6 +1079,18 @@ function renderUnitDetails(unitNumber) {
         ["Length", dimensions ? formatDimension(dimensions.length) : undefined],
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
+    ] : isStc ? [
+        ["Fan diameter", unit.fanDiameterIn == null ? undefined : `${unit.fanDiameterIn}"`],
+        ["Fan motor(s)", unit.fanHp],
+        ["Motor speed", unit.motorRpm == null ? undefined : `${unit.motorRpm} RPM`],
+        ["Cooling rows deep", unit.rowsDeep == null ? undefined : `${unit.rowsDeep} RD`],
+        ["Fins per inch", unit.finsPerInch],
+        ["Coil face area", unit.faceAreaSqFt == null ? undefined : `${unit.faceAreaSqFt} sq. ft.`],
+        ["Coil surface area", unit.surfaceAreaSqFt == null ? undefined : `${unit.surfaceAreaSqFt.toLocaleString()} sq. ft.`],
+        ["Internal coil volume", unit.coilVolumeFt3 == null ? undefined : `${unit.coilVolumeFt3} ft³`],
+        ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString()} FPM`],
+        ["Air flow rate", unit.airFlowCfm == null ? undefined : `${unit.airFlowCfm.toLocaleString()} CFM`],
+        ["SS coil weight", unit.shippingWeightLb == null ? undefined : `${unit.shippingWeightLb.toLocaleString()} lb`]
     ] : [
         ["Nominal box size", unit.nominalSize],
         ["Rated R717 capacity", `${unit.r717Tons?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? "N/A"} Tons`],
@@ -1262,7 +1284,8 @@ function getUnitProductFamily(unit) {
 }
 
 function isPricedProductLine(unit) {
-    return unit.productLine === "IEC" || unit.productLine === "DTC" || unit.productLine === "BTR" ||
+    return unit.productLine === "IEC" || unit.productLine === "DTC" ||
+        unit.productLine === "BTR" || unit.productLine === "STC" ||
         typeof unit.model === "string" && /^(IEC|DTC)-/.test(unit.model);
 }
 
