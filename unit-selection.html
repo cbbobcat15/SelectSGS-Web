@@ -473,6 +473,11 @@
                 <section id="stc-selection-fields" aria-labelledby="stc-selection-heading" hidden>
                     <h2 id="stc-selection-heading">STC Selection</h2>
 
+                    <label for="stc-refrigerant">Refrigerant</label>
+                    <select id="stc-refrigerant" required>
+                        <option value="R717" selected>R717</option>
+                    </select>
+
                     <label for="stc-coil-material">Coil Material</label>
                     <select id="stc-coil-material" required>
                         <option value="" selected disabled>Select coil material</option>
@@ -495,7 +500,7 @@
                         <option value="" selected disabled>Select refrigerant feed</option>
                         <option value="RECIRC">Recirculated</option>
                         <option value="FLOODED">Flooded</option>
-                        <option value="DX">Direct Expansion (DX to 0°F SST)</option>
+                        <option value="DX">DX</option>
                     </select>
                     <p id="stc-factor-warning" role="alert" hidden></p>
                 </section>
@@ -576,9 +581,17 @@
                     <label for="stc-capacity-over">Cap % Over</label>
                     <input id="stc-capacity-over" type="number" min="0" step="any" value="15" required>
                 </div>
+                <div class="btr-result-filter">
+                    <label for="stc-fpi-filter">FPI</label>
+                    <select id="stc-fpi-filter">
+                        <option value="" selected>All</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
             </div>
         </div>
-        <p>When applicable, Wet (32°F SST), R717 DX (0°F SST), and Steel HDG (Recirculated / Flooded) corrections are multiplied into catalog capacity. Models without a rating for the selected condition are excluded.</p>
         <div class="btr-results-table-wrapper">
             <table class="btr-results-table">
                 <thead>
@@ -586,9 +599,10 @@
                         <th scope="col">Model</th>
                         <th scope="col">Coil Cap<br>BTUH/TD</th>
                         <th scope="col">Cap % Diff</th>
-                        <th scope="col">Correction Factor</th>
                         <th scope="col">Face Vel<br>(FPM)</th>
+                        <th scope="col">CFM</th>
                         <th scope="col">Fan HP</th>
+                        <th scope="col">Motor RPM</th>
                         <th scope="col">List Price</th>
                     </tr>
                 </thead>
@@ -922,6 +936,7 @@ const btrCapacityOverInput = document.getElementById("btr-capacity-over");
 const stcSelectionFields = document.getElementById("stc-selection-fields");
 const stcCoilMaterialSelect = document.getElementById("stc-coil-material");
 const stcDefrostTypeSelect = document.getElementById("stc-defrost-type");
+const stcRefrigerantSelect = document.getElementById("stc-refrigerant");
 const stcRefrigerantFeedSelect = document.getElementById("stc-refrigerant-feed");
 const stcFactorWarning = document.getElementById("stc-factor-warning");
 const stcResultsPanel = document.getElementById("stc-results-panel");
@@ -929,6 +944,7 @@ const stcResultsRows = document.getElementById("stc-results-rows");
 const stcResultsStatus = document.getElementById("stc-results-status");
 const stcCapacityUnderInput = document.getElementById("stc-capacity-under");
 const stcCapacityOverInput = document.getElementById("stc-capacity-over");
+const stcFpiFilterSelect = document.getElementById("stc-fpi-filter");
 const unitSelectionActions = document.getElementById("unit-selection-actions");
 const findUnitButton = document.getElementById("find-unit");
 const addToQuoteButton = document.getElementById("add-to-quote");
@@ -1208,12 +1224,12 @@ function findStcUnits() {
         return;
     }
 
-    const invalidSelectionInput = [stcCoilMaterialSelect, stcDefrostTypeSelect, stcRefrigerantFeedSelect].find(input =>
+    const invalidSelectionInput = [stcRefrigerantSelect, stcCoilMaterialSelect, stcDefrostTypeSelect, stcRefrigerantFeedSelect].find(input =>
         !input.checkValidity()
     );
     if (invalidSelectionInput) {
         invalidSelectionInput.reportValidity();
-        stcResultsStatus.textContent = "Choose an STC coil material, defrost type and R717 refrigerant feed.";
+        stcResultsStatus.textContent = "Choose an STC refrigerant, coil material, defrost type and refrigerant feed.";
         return;
     }
     if (stcCoilMaterialSelect.value === "HDG" && stcRefrigerantFeedSelect.value === "DX") {
@@ -1248,6 +1264,7 @@ function findStcUnits() {
     const defrostType = stcDefrostTypeSelect.value;
     const minimumDifference = Number(stcCapacityUnderInput.value);
     const maximumDifference = Number(stcCapacityOverInput.value);
+    const fpiFilter = stcFpiFilterSelect.value === "" ? null : Number(stcFpiFilterSelect.value);
     const maximumFaceVelocity = Number(roomTemperatureInput.value) > 34 ? 630 : Infinity;
     const availableUnits = window.selectSgsStcRatings;
     if (!Array.isArray(availableUnits) || availableUnits.length === 0) {
@@ -1264,6 +1281,7 @@ function findStcUnits() {
 
     const missingCorrectionModels = new Set();
     stcMatchingUnits = availableUnits.flatMap(unit => {
+        if (fpiFilter !== null && unit.finsPerInch !== fpiFilter) return [];
         const catalogCoilCapacity = unit[capacityKey];
         if (!Number.isFinite(catalogCoilCapacity)) return [];
         const rowCount = Number(unit.rowsDeep);
@@ -1285,7 +1303,7 @@ function findStcUnits() {
             return [];
         }
         if (refrigerantFeed === "DX" &&
-            !addCorrection("R717 Ammonia (NHS) DX to 0°F SST", capacityCorrections.r717AmmoniaDxTo0FSst)) {
+            !addCorrection("R717 Ammonia (NHS) DX", capacityCorrections.r717AmmoniaDxTo0FSst)) {
             missingCorrectionModels.add(`${unit.model} (${rowCount} rows, R717 DX)`);
             return [];
         }
@@ -1317,6 +1335,7 @@ function findStcUnits() {
         return [{
             ...unit,
             coilMaterial,
+            refrigerant: stcRefrigerantSelect.value,
             refrigerantFeed,
             defrostType,
             pricingModel,
@@ -1348,9 +1367,10 @@ function findStcUnits() {
             unit.model,
             formatBtrNumber(unit.coilCapacity, 0),
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
-            `${formatBtrNumber(unit.capacityCorrectionFactor, 3)}×`,
             formatBtrNumber(unit.faceVelocity, 0),
+            Number.isFinite(unit.airFlowCfm) ? unit.airFlowCfm.toLocaleString() : "N/A",
             unit.fanHp,
+            Number.isFinite(unit.motorRpm) ? unit.motorRpm.toLocaleString() : "N/A",
             unit.listPrice ? formatCurrency(unit.listPrice) : "N/A"
         ];
         for (const value of values) {
@@ -1361,7 +1381,7 @@ function findStcUnits() {
         stcResultsRows.append(row);
     }
     stcResultsStatus.textContent = stcMatchingUnits.length
-        ? `${stcMatchingUnits.length} matching STC coil${stcMatchingUnits.length === 1 ? "" : "s"} found. Models without a listed ${coilRatingCondition} rating are excluded.`
+        ? ""
         : `No STC coils match the selected capacity range and ${coilRatingCondition} rating condition.`;
 }
 
@@ -1500,7 +1520,7 @@ productLineSelect.addEventListener("change", () => {
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -1516,10 +1536,10 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 clearBtrResults();
             } else if (input.matches("#btr-capacity-under, #btr-capacity-over")) {
                 clearBtrResults();
-            } else if (input.matches("#stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed")) {
+            } else if (input.matches("#stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed")) {
                 updateBtrSelectionVisibility();
                 clearStcResults();
-            } else if (input.matches("#stc-capacity-under, #stc-capacity-over")) {
+            } else if (input.matches("#stc-capacity-under, #stc-capacity-over, #stc-fpi-filter")) {
                 clearStcResults();
             }
             if (!selectedUnitModel) return;
@@ -1565,6 +1585,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
                 targetCoilTemperature: roomTemperature - targetTd,
                 capacityUnder: Number(stcCapacityUnderInput.value),
                 capacityOver: Number(stcCapacityOverInput.value),
+                fpiFilter: stcFpiFilterSelect.value,
                 location: unitRow.location || "",
                 tag: unitRow.tag || ""
             };
@@ -1795,11 +1816,13 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                 } else {
                     stcCoilMaterialSelect.value = savedUnit.coilMaterial ?? "SS";
                     stcDefrostTypeSelect.value = savedUnit.defrostType ?? "A";
+                    stcRefrigerantSelect.value = savedUnit.refrigerant ?? "R717";
                     stcRefrigerantFeedSelect.value = savedUnit.refrigerantFeed === "FLOODED" || savedUnit.refrigerantFeed === "DX"
                         ? savedUnit.refrigerantFeed
                         : "RECIRC";
                     stcCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
                     stcCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
+                    stcFpiFilterSelect.value = savedUnit.fpiFilter ?? "";
                     updateBtrSelectionVisibility();
                     findStcUnits();
                     if (stcMatchingUnits.some(unit => unit.model === savedUnit.model)) {
