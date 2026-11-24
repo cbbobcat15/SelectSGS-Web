@@ -1055,7 +1055,7 @@ function renderUnitDetails(unitNumber) {
         ["Coil material", { SS: "SS", AL: "AL", CU: "CU", HDG: "Steel HDG" }[unit.coilMaterial]],
         ["Defrost type", { A: "A-Air", HGC: "HGC-Hot Gas Coil Only", HTS: "HTS-Hot Gas Unit (Series)" }[unit.defrostType] ?? "A-Air"],
         ["R717 feed", { DX: "Direct Expansion (DX to 0°F SST)", FLOODED: "Flooded", RECIRC: "Recirculated" }[unit.refrigerantFeed] ?? "Recirculated"],
-        ["Corrected capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
+        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
         ["Total TR per Unit", unit.coilCapacity == null || unit.targetTd == null
             ? undefined
             : (unit.coilCapacity * unit.targetTd / 12000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })],

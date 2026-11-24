@@ -586,8 +586,8 @@
                         <th scope="col">Model</th>
                         <th scope="col">Coil Cap<br>BTUH/TD</th>
                         <th scope="col">Cap % Diff</th>
-                        <th scope="col">Correction Factor</th>
                         <th scope="col">Face Vel<br>(FPM)</th>
+                        <th scope="col">CFM</th>
                         <th scope="col">Fan HP</th>
                         <th scope="col">List Price</th>
                     </tr>
@@ -1348,8 +1348,8 @@ function findStcUnits() {
             unit.model,
             formatBtrNumber(unit.coilCapacity, 0),
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
-            `${formatBtrNumber(unit.capacityCorrectionFactor, 3)}×`,
             formatBtrNumber(unit.faceVelocity, 0),
+            Number.isFinite(unit.airFlowCfm) ? unit.airFlowCfm.toLocaleString() : "N/A",
             unit.fanHp,
             unit.listPrice ? formatCurrency(unit.listPrice) : "N/A"
         ];
