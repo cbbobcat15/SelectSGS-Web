@@ -20,7 +20,7 @@ STC uses the evaporator design inputs and capacity-matching workflow used by BTR
 3. Calculate required capacity per coil as `Room Load × 12,000 ÷ Target TD ÷ Number of Evaporators`.
 4. Multiply the catalog rating by each applicable capacity correction factor before matching:
    - Wet Coil to 32°F SST: 4/6/8 rows use 1.13/1.12/1.10.
-   - R717 Ammonia (NHS) DX to 0°F SST: 4/6/8 rows use 0.75/0.83/0.84 when DX is selected.
+   - R717 Ammonia (NHS) DX: 4/6/8 rows use 0.75/0.83/0.84 whenever DX is selected, at any SST (the label no longer ties it to 0°F).
    - Steel HDG Recirculated / Flooded: 4/6/8 rows use 0.87/0.88/0.90 when Steel HDG is selected with Recirculated / Flooded feed.
 5. Multiply all applicable factors together. SS, AL, and CU use the catalog ratings without a material adjustment. The provided table has no Steel HDG + DX correction, so that combination is unavailable.
 6. Calculate capacity difference as `(corrected capacity - required capacity per coil) / required capacity per coil × 100`.
