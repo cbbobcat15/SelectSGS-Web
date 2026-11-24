@@ -893,6 +893,7 @@
 <script src="stc-ratings.js?v=20261123-1506"></script>
 <script src="stc-product-pricing.js?v=20261124-1850"></script>
 <script src="stc-dimensions.js?v=20261124-1850"></script>
+<script src="cf-product-pricing.js?v=20261124-1900"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -925,12 +926,16 @@ const writeInOptionPanel = document.getElementById("write-in-options");
 const writeInOptionRows = document.getElementById("write-in-option-rows");
 const optionLineCount = 12;
 const btrSelectableOptionLineCount = 6;
+const cfSelectableOptionLineCount = 10;
 const writeInOptionCount = 3;
 const btrNoCoverOptionId = "btr-drain-pan-no-cover";
 const btrInsulatedCoverOptionId = "btr-drain-pan-ss-cover";
 const btrHygienicCoverOptionId = "btr-drain-pan-ss-welded-hygienic";
 const stcStandardPanOptionId = "stc-drain-pan-standard";
 const stcPanCoverOptionIds = ["Insulated_Pan_Cover", "SS_Pan_Cover"];
+const cfStandardPanOptionId = "cf-drain-pan-standard";
+const cfPanCoverOptionIds = ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS", "CF_SS_Pan_Cover"];
+const cfInsulatedPanOptionIds = ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS"];
 const hdgOptionId = "Internal_HDG_Plt";
 const legacyHdgOptionId = "hdg-internal-service-platform";
 const productPrices = window.selectSgsProductPricing?.models ?? {};
@@ -1010,6 +1015,34 @@ function getStcModelNumber(unit) {
     return `STC${modelMatch[1]}${materialCode}-${modelMatch[2]}-${feedCode}${refrigerantCode}-${defrostCode}`;
 }
 
+// CF model number: CF<tube><material><fans><fan size>-<face area><rows><FPI><motor HP>-<feed><refrigerant>-<defrost>-<hand><discharge>,
+// e.g. CFDA2A-641035-RBA-HGS-RHTH. A, HGC and ED become IA, IHGC and IED when an insulated pan cover
+// is selected; an Electrofin or Heresite coating adds -EF or -HC.
+function getCfModelNumber(unit) {
+    const materialCode = { AL: "A", SS: "B", CU: "C", HDG: "S" }[unit.coilMaterial];
+    const refrigerantCode = { R717: "A" }[unit.refrigerant ?? "R717"];
+    const modelMatch = /^([1-4])([A-H])-(\d+)$/.exec(unit.model ?? "");
+    if (!materialCode || !refrigerantCode || !modelMatch || !unit.refrigerantFeed || !unit.defrostType) return "Unavailable";
+    const selectedIds = (unit.options ?? []).map(option => option.optionId);
+    const insulatedPanSelected = selectedIds.some(id => cfInsulatedPanOptionIds.includes(id));
+    const defrostCode = {
+        A: insulatedPanSelected ? "IA" : "A",
+        HGC: insulatedPanSelected ? "IHGC" : "HGC",
+        ED: insulatedPanSelected ? "IED" : "ED"
+    }[unit.defrostType] ?? unit.defrostType;
+    const coating = selectedIds.includes("CF_Electrofin") ? "-EF" : selectedIds.includes("CF_Heresite") ? "-HC" : "";
+    const rowsAndFpi = `${unit.faceArea}${unit.rowsDeep}${unit.finsPerInch}${unit.fanHp}`;
+    return `CF${unit.tube}${materialCode}${unit.fans}${unit.fanSize}-${rowsAndFpi}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}-${unit.hand ?? "RH"}${unit.fanDischarge ?? "TH"}${coating}`;
+}
+
+function getEvaporatorModelNumber(unit) {
+    return unit.productLine === "CF"
+        ? getCfModelNumber(unit)
+        : unit.productLine === "STC"
+            ? getStcModelNumber(unit)
+            : getBtrAirUnitModelNumber(unit);
+}
+
 function getBtrFanMotorHpValue(value) {
     if (Number.isFinite(value)) return value;
     if (typeof value !== "string") return null;
@@ -1039,7 +1072,8 @@ function renderUnitDetails(unitNumber) {
 
     const isBtr = unit.productLine === "BTR";
     const isStc = unit.productLine === "STC";
-    details.classList.toggle("unit-specifications--btr", isBtr || isStc);
+    const isCf = unit.productLine === "CF";
+    details.classList.toggle("unit-specifications--btr", isBtr || isStc || isCf);
     const options = getUnitOptions(unit);
     renderOptionRows(options, unit);
     optionsPanel.hidden = false;
@@ -1066,6 +1100,10 @@ function renderUnitDetails(unitNumber) {
     const stcDimensions = isStc
         ? window.selectSgsStcDimensions?.[unit.model?.match(/^STC(\d)/)?.[1]]?.[unit.fanDiameterIn]?.[unit.rowsDeep]
         : undefined;
+    const cfDimensions = isCf ? unit.dimensionsIn : undefined;
+    const cfCoilWeight = isCf
+        ? unit.coilMaterial === "HDG" ? unit.steelWeightLb : unit.aluminumWeightLb
+        : undefined;
     const primaryFields = isBtr ? [
         ["Number of AHU", unit.numberOfEvaporators],
         ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
@@ -1076,6 +1114,16 @@ function renderUnitDetails(unitNumber) {
         ["Fan diameter", fanSpecifications ? `${fanSpecifications.diameterIn}"` : undefined],
         ["Fan motor(s)", fanMotorHp],
         ["Coil tube diameter", `3/4"`]
+    ] : isCf ? [
+        ["Number of AHU", unit.numberOfEvaporators],
+        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })} BTUH/TD`],
+        ["Req. tons per unit", Number.isFinite(tonsPerEvaporator) ? `${tonsPerEvaporator.toLocaleString()} TR` : undefined],
+        ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
+        ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
+        ["ESP", unit.esp == null ? undefined : `${unit.esp}"`],
+        ["Fan size", unit.fanSize],
+        ["Fan motor(s)", unit.fanHp == null ? undefined : `${unit.fanHp.toLocaleString(undefined, { maximumFractionDigits: 2 })} HP`],
+        ["Coil tube diameter", unit.tube === "E" ? `1"` : `3/4"`]
     ] : isStc ? [
         ["Number of AHU", unit.numberOfEvaporators],
         ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })} BTUH/TD`],
@@ -1114,6 +1162,17 @@ function renderUnitDetails(unitNumber) {
         ["Length", dimensions ? formatDimension(dimensions.length) : undefined],
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
+    ] : isCf ? [
+        ["Hand / discharge", unit.hand ? `${unit.hand} / ${unit.fanDischarge}` : undefined],
+        ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
+        ["Cooling rows deep", unit.rowsDeep == null ? undefined : `${unit.rowsDeep} RD`],
+        ["Fins per inch", unit.finsPerInch == null ? undefined : `${unit.finsPerInch} FPI`],
+        ["Total surface", unit.surfaceAreaSqFt == null ? undefined : `${unit.surfaceAreaSqFt.toLocaleString()} sq. ft.`],
+        ["Coil weight", Number.isFinite(cfCoilWeight) ? `${cfCoilWeight.toLocaleString()} lb` : undefined],
+        ["Air flow rate", unit.airFlowCfm == null ? undefined : `${unit.airFlowCfm.toLocaleString()} CFM`],
+        ["Length", cfDimensions ? formatDimension(cfDimensions[0]) : undefined],
+        ["Width", cfDimensions ? formatDimension(cfDimensions[1]) : undefined],
+        ["Height", cfDimensions ? formatDimension(cfDimensions[2]) : undefined]
     ] : isStc ? [
         ["Motor speed", unit.motorRpm == null ? undefined : `${unit.motorRpm} RPM`],
         ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
@@ -1163,9 +1222,9 @@ function renderUnitDetails(unitNumber) {
         model.querySelector("span").textContent = "Air Unit Model Number";
         modelValue.textContent = getBtrAirUnitModelNumber(unit);
         details.append(columns, model);
-    } else if (isStc) {
+    } else if (isStc || isCf) {
         model.querySelector("span").textContent = "Model Number";
-        modelValue.textContent = getStcModelNumber(unit);
+        modelValue.textContent = isCf ? getCfModelNumber(unit) : getStcModelNumber(unit);
         details.append(columns, model);
     } else {
         details.append(model, columns);
@@ -1323,7 +1382,7 @@ function getUnitProductFamily(unit) {
 
 function isPricedProductLine(unit) {
     return unit.productLine === "IEC" || unit.productLine === "DTC" ||
-        unit.productLine === "BTR" || unit.productLine === "STC" ||
+        unit.productLine === "BTR" || unit.productLine === "STC" || unit.productLine === "CF" ||
         typeof unit.model === "string" && /^(IEC|DTC)-/.test(unit.model);
 }
 
@@ -1394,6 +1453,41 @@ function getProductPricing(unit) {
         };
     }
 
+    if (unit.productLine === "CF") {
+        const pricingData = window.selectSgsCfProductPricing;
+        const pricing = pricingData?.models?.[unit.pricingModel];
+        const defrostKey = { A: "A_HGC", HGC: "A_HGC", HGS: "HGS_HGP", HGP: "HGS_HGP", ED: "ED", EDL: "EDL" }[unit.defrostType];
+        const basePrice = pricing?.basePrices?.[defrostKey];
+        const motorAdder = pricingData?.motorAdders?.[String(pricing?.standardHp)]?.[String(unit.fanHp)];
+        if (!pricing || !Number.isFinite(basePrice) || !Number.isFinite(motorAdder)) return null;
+        // Insulated covers upgrade A, HGC and ED units; hot gas pan and EDL units already include a mill galvanized cover.
+        const insulatedCoverDefrost = ["A", "HGC", "ED"].includes(unit.defrostType);
+        const includedCover = ["HGS", "HGP", "EDL"].includes(unit.defrostType);
+        const panCoverOptions = insulatedCoverDefrost
+            ? ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS"]
+            : ["CF_SS_Pan_Cover"];
+        const definitions = pricingData.optionDefinitions;
+        return {
+            basePrice: basePrice + motorAdder * unit.fans,
+            options: [
+                {
+                    id: cfStandardPanOptionId,
+                    label: includedCover
+                        ? "Standard Drain Pan w/ Mill Galv. Insulated Cover (included)"
+                        : "Standard Drain Pan (no cover)",
+                    price: 0,
+                    uom: "per Unit"
+                },
+                ...definitions.flatMap((definition, index) => {
+                    const price = pricing.options?.[index];
+                    if (!price) return [];
+                    if (cfPanCoverOptionIds.includes(definition.id) && !panCoverOptions.includes(definition.id)) return [];
+                    return [{ ...definition, price, uom: "per Unit" }];
+                })
+            ]
+        };
+    }
+
     return productPrices[unit.model] ?? null;
 }
 
@@ -1410,6 +1504,7 @@ function getOptionUom(unit, pricing) {
 }
 
 function getUnitOptionLineCount(unit) {
+    if (unit.productLine === "CF") return cfSelectableOptionLineCount + 1;
     return usesEvaporatorOptionLayout(unit) ? btrSelectableOptionLineCount + 1 : optionLineCount;
 }
 
@@ -1494,13 +1589,31 @@ function getUnitOptions(unit) {
         if (drainPanIndex === -1) unit.options[0].optionId = stcStandardPanOptionId;
     }
 
+    if (unit.productLine === "CF") {
+        let hasDrainPanOption = false;
+        for (const option of unit.options) {
+            if (!isCfDrainPanOptionId(option.optionId)) continue;
+            if (hasDrainPanOption) option.optionId = "";
+            else hasDrainPanOption = true;
+        }
+        const drainPanIndex = unit.options.findIndex(option => isCfDrainPanOptionId(option.optionId));
+        if (drainPanIndex > 0) {
+            [unit.options[0], unit.options[drainPanIndex]] = [unit.options[drainPanIndex], unit.options[0]];
+        }
+        if (drainPanIndex === -1) unit.options[0].optionId = cfStandardPanOptionId;
+    }
+
     return unit.options;
 }
 
 // BTR and STC evaporators share one option layout: a single drain pan selector,
 // six selectable option rows, and three write-in rows.
 function usesEvaporatorOptionLayout(unit) {
-    return unit.productLine === "BTR" || unit.productLine === "STC";
+    return unit.productLine === "BTR" || unit.productLine === "STC" || unit.productLine === "CF";
+}
+
+function isCfDrainPanOptionId(optionId) {
+    return optionId === cfStandardPanOptionId || cfPanCoverOptionIds.includes(optionId);
 }
 
 function isStcDrainPanOptionId(optionId) {
@@ -1508,9 +1621,11 @@ function isStcDrainPanOptionId(optionId) {
 }
 
 function isDrainPanOptionId(unit, optionId) {
-    return unit.productLine === "STC"
-        ? isStcDrainPanOptionId(optionId)
-        : isBtrDrainPanOptionId(optionId);
+    return unit.productLine === "CF"
+        ? isCfDrainPanOptionId(optionId)
+        : unit.productLine === "STC"
+            ? isStcDrainPanOptionId(optionId)
+            : isBtrDrainPanOptionId(optionId);
 }
 
 function isBtrDrainPanOptionId(optionId) {
@@ -1637,6 +1752,7 @@ function saveQuotedUnits() {
         return false;
     }
 
+    if (!activeProjectId && projectForm.checkValidity()) return createProjectInTree();
     return saveActiveProjectToTree();
 }
 
@@ -1718,7 +1834,9 @@ exportQuoteButton.addEventListener("click", async () => {
                     ? getBtrAirUnitModelNumber(unit)
                     : unit.productLine === "STC"
                         ? getStcModelNumber(unit)
-                        : unit.model,
+                        : unit.productLine === "CF"
+                            ? getCfModelNumber(unit)
+                            : unit.model,
                 baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
                 cellCount: getUnitCellCount(unit),
                 options: [
@@ -1887,7 +2005,7 @@ function renderProjectTree() {
         archivedProjectTreeToggle.setAttribute("aria-expanded", "false");
     }
     projectTreeStatus.textContent = activeProjects.length
-        ? `${activeProjects.length} project${activeProjects.length === 1 ? "" : "s"}`
+        ? `${activeProjects.length} project${activeProjects.length === 1 ? "" : "s"}${activeProject ? " · changes save automatically" : ""}`
         : archivedProjects.length ? "No active projects." : "No projects added yet.";
     archivedProjectTreeToggle.hidden = archivedProjects.length === 0;
     archivedProjectTreeToggle.textContent =
@@ -1970,13 +2088,23 @@ function deleteProject(project) {
     if (!saveTreeMutation(previousProjects)) return;
 
     if (project.id === activeProjectId) {
+        // Start a blank project so automatic saving does not re-add the deleted one.
         activeProjectId = null;
         try {
-            sessionStorage.removeItem("selectsgs-active-project-id");
+            for (const key of [
+                "selectsgs-project",
+                "selectsgs-unit-rows",
+                "selectsgs-quoted-units",
+                "selectsgs-cost-multiplier",
+                "selectsgs-active-project-id"
+            ]) {
+                sessionStorage.removeItem(key);
+            }
+            window.location.href = "index.html";
         } catch (error) {
-            showProjectTreeError("The project was deleted, but its active-project marker could not be cleared.", error);
+            showProjectTreeError("The project was deleted, but the project form could not be cleared.", error);
+            renderProjectTree();
         }
-        renderProjectTree();
     }
 }
 
@@ -2092,21 +2220,15 @@ try {
 
 loadProjectTree();
 saveActiveProjectToTree();
+if (!activeProjectId && projectForm.checkValidity()) createProjectInTree();
 
-addToProjectTreeButton.addEventListener("click", () => {
-    if (!saveProjectData()) return;
-
-    if (activeProjectId) {
-        projectTreeStatus.textContent = "Project changes saved.";
-        return;
-    }
-
+function createProjectInTree() {
     const project = getProjectSnapshot();
     project.id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     projectTreeProjects.unshift(project);
     if (!saveProjectTree()) {
         projectTreeProjects.shift();
-        return;
+        return false;
     }
 
     try {
@@ -2116,6 +2238,26 @@ addToProjectTreeButton.addEventListener("click", () => {
         showProjectTreeError("The project was added, but the active project could not be remembered in this browser.", error);
     }
     renderProjectTree();
+    return true;
+}
+
+// Automatic saving: once the required project fields are complete, the project is added to the
+// project tree on its own; from then on every change is saved to it (see saveActiveProjectToTree).
+function autoSaveProject() {
+    if (!saveProjectData()) return false;
+    if (!activeProjectId && projectForm.checkValidity()) return createProjectInTree();
+    return true;
+}
+
+addToProjectTreeButton.addEventListener("click", () => {
+    if (!saveProjectData()) return;
+
+    if (activeProjectId) {
+        projectTreeStatus.textContent = "Project changes saved.";
+        return;
+    }
+
+    createProjectInTree();
 });
 
 newProjectButton.addEventListener("click", () => {
@@ -2139,11 +2281,11 @@ newProjectButton.addEventListener("click", () => {
 
 for (const field of projectFields) {
     field.addEventListener("input", () => {
-        saveProjectData();
+        autoSaveProject();
         updateUnitList();
     });
     field.addEventListener("change", () => {
-        saveProjectData();
+        autoSaveProject();
         updateUnitList();
     });
 }
@@ -2298,12 +2440,10 @@ optionsPanel.addEventListener("change", event => {
         } else {
             options[index].optionId = select.value;
         }
-        if (usesEvaporatorOptionLayout(activeUnit) && index === 0) {
+        if (usesEvaporatorOptionLayout(activeUnit) && (index === 0 || activeUnit.productLine === "CF")) {
             const modelValue = document.querySelector("#unit-details-list .unit-detail-model strong");
             if (modelValue) {
-                modelValue.textContent = activeUnit.productLine === "STC"
-                    ? getStcModelNumber(activeUnit)
-                    : getBtrAirUnitModelNumber(activeUnit);
+                modelValue.textContent = getEvaporatorModelNumber(activeUnit);
             }
         }
         saveQuotedUnits();
