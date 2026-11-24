@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SelectSGS Web | Sign In</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px;
+            background: #f4f6f8;
+            color: #263746;
+            font-family: Arial, sans-serif;
+        }
+
+        .login-card {
+            width: min(100%, 400px);
+            padding: 32px;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, .1);
+        }
+
+        h1 {
+            margin: 0 0 4px;
+            color: #004f9f;
+            font-size: 1.6rem;
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            color: #5c6b78;
+        }
+
+        label {
+            display: block;
+            margin-top: 16px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            margin-top: 6px;
+            padding: 10px;
+            border: 1px solid #8797a5;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 24px;
+            padding: 11px;
+            border: 0;
+            border-radius: 4px;
+            background: #004f9f;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        .error {
+            min-height: 1.3em;
+            margin: 16px 0 0;
+            color: #b00020;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<main class="login-card">
+    <h1>SelectSGS Web</h1>
+    <p class="subtitle">Sign in to continue</p>
+    <form id="login-form" autocomplete="on" novalidate>
+        <label for="username">User name</label>
+        <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="error" role="alert"></p>
+        <button id="login-submit" type="submit">Sign In</button>
+    </form>
+</main>
+<script src="auth.js"></script>
+<script>
+    (function () {
+        if (SelectSGSAuth.currentUser()) {
+            window.location.replace(SelectSGSAuth.nextPage());
+            return;
+        }
+        var form = document.getElementById("login-form");
+        var error = document.getElementById("login-error");
+        var submit = document.getElementById("login-submit");
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            var username = document.getElementById("username").value;
+            var password = document.getElementById("password").value;
+            if (!username.trim() || !password) {
+                error.textContent = "Enter your user name and password.";
+                return;
+            }
+            error.textContent = "";
+            submit.disabled = true;
+            SelectSGSAuth.login(username, password).then(function (result) {
+                if (result.ok) {
+                    window.location.replace(SelectSGSAuth.nextPage());
+                    return;
+                }
+                error.textContent = result.error;
+                document.getElementById("password").value = "";
+                submit.disabled = false;
+            }).catch(function () {
+                error.textContent = "Sign-in failed. Please try again.";
+                submit.disabled = false;
+            });
+        });
+    }());
+</script>
+</body>
+</html>
