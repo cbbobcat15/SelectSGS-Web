@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>SelectSGS Web | Unit Selection</title>
     <script src="auth.js"></script>
     <script>SelectSGSAuth.requireLogin();</script>
@@ -492,7 +493,8 @@
                     <label for="stc-refrigerant-feed">R717 Refrigerant Feed</label>
                     <select id="stc-refrigerant-feed" required>
                         <option value="" selected disabled>Select refrigerant feed</option>
-                        <option value="RECIRC_FLOODED">Recirculated / Flooded</option>
+                        <option value="RECIRC">Recirculated</option>
+                        <option value="FLOODED">Flooded</option>
                         <option value="DX">Direct Expansion (DX to 0°F SST)</option>
                     </select>
                     <p id="stc-factor-warning" role="alert" hidden></p>
@@ -977,7 +979,7 @@ function updateBtrSelectionVisibility() {
     const stcHdgDxUnsupported = activeProductLine === "STC" &&
         stcCoilMaterialSelect.value === "HDG" && stcRefrigerantFeedSelect.value === "DX";
     stcFactorWarning.textContent = stcHdgDxUnsupported
-        ? "No Steel HDG correction factor is provided for R717 DX; select Recirculated / Flooded."
+        ? "No Steel HDG correction factor is provided for R717 DX; select Recirculated or Flooded."
         : "";
     stcFactorWarning.hidden = !stcHdgDxUnsupported;
     const stcSelectionsComplete = [...stcSelectionFields.querySelectorAll("select")].every(input => input.checkValidity()) &&
@@ -1216,7 +1218,7 @@ function findStcUnits() {
     }
     if (stcCoilMaterialSelect.value === "HDG" && stcRefrigerantFeedSelect.value === "DX") {
         stcResultsStatus.textContent =
-            "No Steel HDG correction factor is provided for R717 DX; select Recirculated / Flooded.";
+            "No Steel HDG correction factor is provided for R717 DX; select Recirculated or Flooded.";
         return;
     }
 
@@ -1793,7 +1795,9 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                 } else {
                     stcCoilMaterialSelect.value = savedUnit.coilMaterial ?? "SS";
                     stcDefrostTypeSelect.value = savedUnit.defrostType ?? "A";
-                    stcRefrigerantFeedSelect.value = savedUnit.refrigerantFeed ?? "RECIRC_FLOODED";
+                    stcRefrigerantFeedSelect.value = savedUnit.refrigerantFeed === "FLOODED" || savedUnit.refrigerantFeed === "DX"
+                        ? savedUnit.refrigerantFeed
+                        : "RECIRC";
                     stcCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
                     stcCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
                     updateBtrSelectionVisibility();
