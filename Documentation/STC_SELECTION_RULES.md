@@ -10,7 +10,7 @@ STC uses the evaporator design inputs and capacity-matching workflow used by BTR
 - Target TD (°F; greater than zero)
 - Coil material (SS, AL, CU, or Steel HDG)
 - Defrost type (A-Air, HGC-Hot Gas Coil Only, or HTS-Hot Gas Unit (Series))
-- R717 refrigerant feed (Recirculated / Flooded or DX)
+- R717 refrigerant feed (Recirculated, Flooded, or DX; Recirculated and Flooded use the same ratings but are kept separate for the model number)
 - Capacity tolerance filters (defaults to -15% and +15%)
 
 ## Selection Process
