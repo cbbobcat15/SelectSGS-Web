@@ -1542,6 +1542,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
             savedUnits[quoteUnitNumber] = {
                 ...selectedUnit,
                 productLine: "STC",
+                price: selectedUnit.listPrice,
                 cellCount: 1,
                 roomLoad: Number(roomLoadInput.value),
                 numberOfEvaporators: Number(numberOfEvaporatorsInput.value),

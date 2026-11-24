@@ -925,6 +925,8 @@ const writeInOptionCount = 3;
 const btrNoCoverOptionId = "btr-drain-pan-no-cover";
 const btrInsulatedCoverOptionId = "btr-drain-pan-ss-cover";
 const btrHygienicCoverOptionId = "btr-drain-pan-ss-welded-hygienic";
+const stcStandardPanOptionId = "stc-drain-pan-standard";
+const stcPanCoverOptionIds = ["Insulated_Pan_Cover", "SS_Pan_Cover"];
 const hdgOptionId = "Internal_HDG_Plt";
 const legacyHdgOptionId = "hdg-internal-service-platform";
 const productPrices = window.selectSgsProductPricing?.models ?? {};
@@ -1015,10 +1017,10 @@ function renderUnitDetails(unitNumber) {
 
     const isBtr = unit.productLine === "BTR";
     const isStc = unit.productLine === "STC";
-    details.classList.toggle("unit-specifications--btr", isBtr);
+    details.classList.toggle("unit-specifications--btr", isBtr || isStc);
     const options = getUnitOptions(unit);
     renderOptionRows(options, unit);
-    optionsPanel.hidden = isStc;
+    optionsPanel.hidden = false;
 
     const physicalSpecs = isBtr
         ? window.selectSgsBtrPhysicalSpecs?.[getBtrPhysicalModel(unit)]
@@ -1142,6 +1144,8 @@ function renderUnitDetails(unitNumber) {
         model.querySelector("span").textContent = "Air Unit Model Number";
         modelValue.textContent = getBtrAirUnitModelNumber(unit);
         details.append(columns, model);
+    } else if (isStc) {
+        details.append(columns, model);
     } else {
         details.append(model, columns);
     }
@@ -1262,7 +1266,7 @@ function getUnitLinePrice(unit) {
         const optionCount = option.quantity * (getOptionUom(unit, pricing) === "per Cell" ? cellCount : 1);
         return sum + optionCount * pricing.price * costMultiplier;
     }, 0);
-    const writeInOptionNet = unit.productLine === "BTR"
+    const writeInOptionNet = usesEvaporatorOptionLayout(unit)
         ? getUnitWriteInOptions(unit).reduce((sum, option) =>
             option.description.trim() && option.quantity > 0
                 ? sum + option.quantity * option.listPrice * costMultiplier
@@ -1356,7 +1360,15 @@ function getProductPricing(unit) {
         if (!pricing || !Number.isFinite(basePrice)) return null;
         return {
             basePrice,
-            options: pricing.options ?? []
+            options: [
+                {
+                    id: stcStandardPanOptionId,
+                    label: "Standard Drain Pan (no cover)",
+                    price: 0,
+                    uom: "per Unit"
+                },
+                ...(pricing.options ?? []).map(option => ({ ...option, uom: "per Unit" }))
+            ]
         };
     }
 
@@ -1372,11 +1384,11 @@ function getOptionPricing(unit, optionId) {
 }
 
 function getOptionUom(unit, pricing) {
-    return unit.productLine === "BTR" ? "per Unit" : pricing?.uom ?? "—";
+    return usesEvaporatorOptionLayout(unit) ? "per Unit" : pricing?.uom ?? "—";
 }
 
 function getUnitOptionLineCount(unit) {
-    return unit.productLine === "BTR" ? btrSelectableOptionLineCount + 1 : optionLineCount;
+    return usesEvaporatorOptionLayout(unit) ? btrSelectableOptionLineCount + 1 : optionLineCount;
 }
 
 function getUnitOptions(unit) {
@@ -1446,7 +1458,37 @@ function getUnitOptions(unit) {
         }
     }
 
+    if (unit.productLine === "STC") {
+        let hasDrainPanOption = false;
+        for (const option of unit.options) {
+            if (!isStcDrainPanOptionId(option.optionId)) continue;
+            if (hasDrainPanOption) option.optionId = "";
+            else hasDrainPanOption = true;
+        }
+        const drainPanIndex = unit.options.findIndex(option => isStcDrainPanOptionId(option.optionId));
+        if (drainPanIndex > 0) {
+            [unit.options[0], unit.options[drainPanIndex]] = [unit.options[drainPanIndex], unit.options[0]];
+        }
+        if (drainPanIndex === -1) unit.options[0].optionId = stcStandardPanOptionId;
+    }
+
     return unit.options;
+}
+
+// BTR and STC evaporators share one option layout: a single drain pan selector,
+// six selectable option rows, and three write-in rows.
+function usesEvaporatorOptionLayout(unit) {
+    return unit.productLine === "BTR" || unit.productLine === "STC";
+}
+
+function isStcDrainPanOptionId(optionId) {
+    return optionId === stcStandardPanOptionId || stcPanCoverOptionIds.includes(optionId);
+}
+
+function isDrainPanOptionId(unit, optionId) {
+    return unit.productLine === "STC"
+        ? isStcDrainPanOptionId(optionId)
+        : isBtrDrainPanOptionId(optionId);
 }
 
 function isBtrDrainPanOptionId(optionId) {
@@ -1482,7 +1524,7 @@ function getUnitWriteInOptions(unit) {
 function renderOptionRows(options, unit) {
     optionRows.replaceChildren();
     drainPanRows.replaceChildren();
-    const isBtr = unit.productLine === "BTR";
+    const isBtr = usesEvaporatorOptionLayout(unit);
     drainPanOptionPanel.hidden = !isBtr;
     writeInOptionPanel.hidden = !isBtr;
     document.getElementById("options-heading").textContent = isBtr
@@ -1502,7 +1544,7 @@ function renderOptionRows(options, unit) {
             <td data-option-net-price="0" class="option-price">${formatCurrency(0)}</td>
         `;
         const select = row.querySelector('[data-option-select="0"]');
-        for (const productOption of productOptions.filter(option => isBtrDrainPanOptionId(option.id))) {
+        for (const productOption of productOptions.filter(option => isDrainPanOptionId(unit, option.id))) {
             const optionElement = document.createElement("option");
             optionElement.value = productOption.id;
             optionElement.textContent = productOption.label;
@@ -1514,7 +1556,7 @@ function renderOptionRows(options, unit) {
 
     const selectableOptions = isBtr ? options.slice(1) : options;
     const optionChoices = isBtr
-        ? productOptions.filter(option => !isBtrDrainPanOptionId(option.id))
+        ? productOptions.filter(option => !isDrainPanOptionId(unit, option.id))
         : productOptions;
     selectableOptions.forEach((option, rowIndex) => {
         const index = isBtr ? rowIndex + 1 : rowIndex;
@@ -1624,7 +1666,7 @@ function updateQuotePrices() {
         netPrice.textContent = formatCurrency(optionPrice * optionCount * costMultiplier);
     }
 
-    if (activeUnit.productLine === "BTR") {
+    if (usesEvaporatorOptionLayout(activeUnit)) {
         for (const [index, option] of getUnitWriteInOptions(activeUnit).entries()) {
             const netPrice = document.querySelector(`[data-write-in-net-price="${index}"]`);
             if (!netPrice) continue;
@@ -1671,7 +1713,7 @@ exportQuoteButton.addEventListener("click", async () => {
                                 netEachPrice: optionPricing.price * costMultiplier
                             };
                         }),
-                    ...(unit.productLine === "BTR"
+                    ...(usesEvaporatorOptionLayout(unit)
                         ? getUnitWriteInOptions(unit)
                             .filter(option => option.description.trim() && option.quantity > 0)
                             .map(option => ({
@@ -2187,7 +2229,7 @@ optionsPanel.addEventListener("change", event => {
         if (activeUnit.productLine === "BTR" && activeUnit.reheatCoil === "HGR" && index === 1) return;
         const options = getUnitOptions(activeUnit);
         if (select.value === deselectOptionValue) {
-            if (activeUnit.productLine === "BTR") {
+            if (usesEvaporatorOptionLayout(activeUnit)) {
                 if (index === 0) {
                     options[0].optionId = "";
                     options[0].quantity = 1;
@@ -2221,10 +2263,10 @@ optionsPanel.addEventListener("change", event => {
                 );
             }
             renderOptionRows(options, activeUnit);
-            if (activeUnit.productLine === "BTR" && index === 0) {
+            if (usesEvaporatorOptionLayout(activeUnit) && index === 0) {
                 drainPanRows.querySelector('[data-option-select="0"]')?.focus();
             } else {
-                const focusIndex = activeUnit.productLine === "BTR"
+                const focusIndex = usesEvaporatorOptionLayout(activeUnit)
                     ? Math.min(index, getUnitOptionLineCount(activeUnit) - 1)
                     : Math.min(index, options.length - 1);
                 optionRows.querySelector(`[data-option-select="${focusIndex}"]`)?.focus();
@@ -2255,7 +2297,7 @@ validateCostMultiplier();
 
 if (activeUnitNumber) {
     selectLineItem(activeUnitNumber);
-he}
+}
 
 updateUnitList();
 </script>
