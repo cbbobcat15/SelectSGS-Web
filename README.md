@@ -39,3 +39,7 @@ Use **Add to project Tree** on the Project Information page to save the current 
 **Sign-in and access levels**
 
 `index.html` and `unit-selection.html` require sign-in through `login.html`. There is currently one access level, SGS Admin, which is unrestricted. Keep `auth.js` and `login.html` alongside the other pages when hosting. This is a front-end gate rather than server-side security; see [Authentication](./Documentation/AUTHENTICATION.md) for how to add users and levels and for the limitations.
+
+### Automatic project saving
+
+Projects save automatically. Once all required project fields are filled in, the project is added to the project tree on its own, and every later change (project fields, locations and tags, quoted units and options, cost multiplier) is saved to it without clicking a button. The "Save changes to project Tree" button remains as an optional manual save. Deleting the active project starts a blank project.
