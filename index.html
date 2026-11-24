@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SelectSGS Web | Project Information</title>
+    <script src="auth.js"></script>
+    <script>SelectSGSAuth.requireLogin();</script>
     <style>
         * {
             box-sizing: border-box;
@@ -688,6 +690,7 @@
     </style>
 </head>
 <body>
+<script>SelectSGSAuth.mountUserBar();</script>
 <div class="workspace">
 <aside class="project-tree" aria-labelledby="project-tree-heading">
     <h2 id="project-tree-heading">Project Tree</h2>

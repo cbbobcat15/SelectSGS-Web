@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>SelectSGS Web | Unit Selection</title>
+    <script src="auth.js"></script>
+    <script>SelectSGSAuth.requireLogin();</script>
 
     <style>
         * {
@@ -359,6 +361,7 @@
 </head>
 
 <body>
+<script>SelectSGSAuth.mountUserBar();</script>
 
 <div class="container">
     <h1>SelectSGS Web</h1>
