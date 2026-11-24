@@ -1053,6 +1053,7 @@ function renderUnitDetails(unitNumber) {
         ["Product line", "STC Evaporator"],
         ["Number of AHU", unit.numberOfEvaporators],
         ["Coil material", { SS: "SS", AL: "AL", CU: "CU", HDG: "Steel HDG" }[unit.coilMaterial]],
+        ["Defrost type", { A: "A-Air", HGC: "HGC-Hot Gas Coil Only", HTS: "HTS-Hot Gas Unit (Series)" }[unit.defrostType] ?? "A-Air"],
         ["R717 feed", unit.refrigerantFeed === "DX" ? "Direct Expansion (DX to 0°F SST)" : "Recirculated / Flooded"],
         ["Catalog capacity", (unit.catalogCoilCapacity ?? unit.coilCapacity) == null
             ? undefined
@@ -1359,7 +1360,8 @@ function getProductPricing(unit) {
     if (unit.productLine === "STC") {
         const pricingModel = unit.pricingModel;
         const pricing = window.selectSgsStcProductPricing?.models?.[pricingModel];
-        const basePrice = pricing?.basePrices?.["A/HGC"];
+        const pricingKey = unit.defrostType === "HTS" ? "HTS" : "A/HGC";
+        const basePrice = pricing?.basePrices?.[pricingKey];
         if (!pricing || !Number.isFinite(basePrice)) return null;
         return {
             basePrice,

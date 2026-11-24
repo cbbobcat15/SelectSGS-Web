@@ -921,8 +921,6 @@ const stcSelectionFields = document.getElementById("stc-selection-fields");
 const stcCoilMaterialSelect = document.getElementById("stc-coil-material");
 const stcDefrostTypeSelect = document.getElementById("stc-defrost-type");
 const stcRefrigerantFeedSelect = document.getElementById("stc-refrigerant-feed");
-const stcDefrostTypeSelect = document.getElementById("stc-defrost-type");
-const getStcBasePriceKey = defrostType => defrostType === "HTS" ? "HTS" : "A/HGC";
 const stcFactorWarning = document.getElementById("stc-factor-warning");
 const stcResultsPanel = document.getElementById("stc-results-panel");
 const stcResultsRows = document.getElementById("stc-results-rows");
@@ -1150,14 +1148,6 @@ function findBtrUnits() {
         }];
     });
 
-    if (missingCorrectionModels.size) {
-        stcMatchingUnits = [];
-        stcResultsStatus.textContent =
-            `STC correction factors are missing for ${[...missingCorrectionModels].join(", ")}. Refresh the rating data.`;
-        console.error("STC correction factors are missing.", [...missingCorrectionModels]);
-        return;
-    }
-
     btrMatchingUnits = matches;
     btrResultsRows.replaceChildren();
     for (const unit of matches) {
@@ -1317,33 +1307,17 @@ function findStcUnits() {
             ? `STC${modelMatch[1]}${coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S"}-${modelMatch[2]}-${unit.fanDiameterIn === 24 ? "A" : modelMatch[3]}`
             : null;
         let listPrice = null;
-<<<<<<< HEAD
         if (pricingModel) {
-            const pricingKey = stcDefrostTypeSelect.value === "HTS" ? "HTS" : "A/HGC";
+            const pricingKey = defrostType === "HTS" ? "HTS" : "A/HGC";
             const basePrice = window.selectSgsStcProductPricing?.models?.[pricingModel]?.basePrices?.[pricingKey];
-=======
-        if (modelMatch) {
-            const [, fanCount, coilSize, fanCode] = modelMatch;
-            const coilCode = coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S";
-            const sheetFanCode = unit.fanDiameterIn === 24 ? "A" : fanCode;
-            const pricingModel = `STC${fanCount}${coilCode}-${coilSize}-${sheetFanCode}`;
-            const basePrice = window.selectSgsStcProductPricing?.models?.[pricingModel]?.basePrices?.[getStcBasePriceKey(defrostType)];
->>>>>>> d5e2f01c6533ef5d2a3593b59e028b35315a0ac3
             listPrice = Number.isFinite(basePrice) ? basePrice : null;
         }
         return [{
             ...unit,
             coilMaterial,
             refrigerantFeed,
-<<<<<<< HEAD
-            defrostType: stcDefrostTypeSelect.value,
-            pricingModel,
-=======
             defrostType,
-            pricingModel: modelMatch
-                ? `STC${modelMatch[1]}${coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S"}-${modelMatch[2]}-${unit.fanDiameterIn === 24 ? "A" : modelMatch[3]}`
-                : null,
->>>>>>> d5e2f01c6533ef5d2a3593b59e028b35315a0ac3
+            pricingModel,
             listPrice,
             coilCapacity,
             catalogCoilCapacity,
@@ -1354,6 +1328,14 @@ function findStcUnits() {
             faceVelocity: unit.faceVelocityFpm
         }];
     });
+
+    if (missingCorrectionModels.size) {
+        stcMatchingUnits = [];
+        stcResultsStatus.textContent =
+            `STC correction factors are missing for ${[...missingCorrectionModels].join(", ")}. Refresh the rating data.`;
+        console.error("STC correction factors are missing.", [...missingCorrectionModels]);
+        return;
+    }
 
     for (const unit of stcMatchingUnits) {
         const row = document.createElement("tr");
