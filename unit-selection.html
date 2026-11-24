@@ -587,7 +587,6 @@
                 </div>
             </div>
         </div>
-        <p>When applicable, Wet (32°F SST), R717 DX (0°F SST), and Steel HDG (Recirculated / Flooded) corrections are multiplied into catalog capacity. Models without a rating for the selected condition are excluded.</p>
         <div class="btr-results-table-wrapper">
             <table class="btr-results-table">
                 <thead>
@@ -1375,7 +1374,7 @@ function findStcUnits() {
         stcResultsRows.append(row);
     }
     stcResultsStatus.textContent = stcMatchingUnits.length
-        ? `${stcMatchingUnits.length} matching STC coil${stcMatchingUnits.length === 1 ? "" : "s"} found. Models without a listed ${coilRatingCondition} rating are excluded.`
+        ? ""
         : `No STC coils match the selected capacity range and ${coilRatingCondition} rating condition.`;
 }
 
