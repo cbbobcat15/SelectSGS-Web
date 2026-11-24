@@ -565,7 +565,7 @@
                 </div>
             </div>
         </div>
-        <p>When applicable, Wet (32°F SST), R717 DX (0°F SST), and Steel HDG (Recirculated / Flooded) corrections are multiplied into catalog capacity. Models without a rating for the selected condition are excluded. List pricing is not available yet.</p>
+        <p>When applicable, Wet (32°F SST), R717 DX (0°F SST), and Steel HDG (Recirculated / Flooded) corrections are multiplied into catalog capacity. Models without a rating for the selected condition are excluded.</p>
         <div class="btr-results-table-wrapper">
             <table class="btr-results-table">
                 <thead>
@@ -576,6 +576,7 @@
                         <th scope="col">Correction Factor</th>
                         <th scope="col">Face Vel<br>(FPM)</th>
                         <th scope="col">Fan HP</th>
+                        <th scope="col">List Price</th>
                     </tr>
                 </thead>
                 <tbody id="stc-results-rows"></tbody>
@@ -600,6 +601,7 @@
 <script src="stc-ratings.js?v=20261123-1506"></script>
 <script src="product-pricing.js?v=20261111-1525"></script>
 <script src="btr-product-pricing.js?v=20261117-1600"></script>
+<script src="stc-product-pricing.js?v=20261124-1850"></script>
 <script>
 
 const wetBulbTemperatures = [
@@ -1295,10 +1297,25 @@ function findStcUnits() {
             unit.faceVelocityFpm > maximumFaceVelocity) {
             return [];
         }
+        const modelMatch = /^STC(\d+)-(\d{2})-([A-C])[A-Z]$/.exec(unit.model);
+        let listPrice = null;
+        if (modelMatch) {
+            const [, fanCount, coilSize, fanCode] = modelMatch;
+            const coilCode = coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S";
+            const sheetFanCode = unit.fanDiameterIn === 24 ? "A" : fanCode;
+            const pricingModel = `STC${fanCount}${coilCode}-${coilSize}-${sheetFanCode}`;
+            const basePrice = window.selectSgsStcProductPricing?.models?.[pricingModel]?.basePrices?.["A/HGC"];
+            listPrice = Number.isFinite(basePrice) ? basePrice : null;
+        }
         return [{
             ...unit,
             coilMaterial,
             refrigerantFeed,
+            defrostType: "A",
+            pricingModel: modelMatch
+                ? `STC${modelMatch[1]}${coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S"}-${modelMatch[2]}-${unit.fanDiameterIn === 24 ? "A" : modelMatch[3]}`
+                : null,
+            listPrice,
             coilCapacity,
             catalogCoilCapacity,
             capacityCorrectionFactor,
@@ -1320,7 +1337,8 @@ function findStcUnits() {
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
             `${formatBtrNumber(unit.capacityCorrectionFactor, 3)}×`,
             formatBtrNumber(unit.faceVelocity, 0),
-            unit.fanHp
+            unit.fanHp,
+            unit.listPrice ? formatCurrency(unit.listPrice) : "N/A"
         ];
         for (const value of values) {
             const cell = document.createElement("td");

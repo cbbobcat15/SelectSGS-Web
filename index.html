@@ -887,6 +887,8 @@
 <script src="iec-engineering-data.js?v=20261111-2016"></script>
 <script src="btr-ratings.js?v=20261117-1624"></script>
 <script src="btr-product-pricing.js?v=20261117-1600"></script>
+<script src="stc-ratings.js?v=20261123-1506"></script>
+<script src="stc-product-pricing.js?v=20261124-1850"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -1344,6 +1346,17 @@ function getProductPricing(unit) {
                     (option.id !== "inv_ready_mtr_WD" || unit.defrostType === "WD")
                 )
             ]
+        };
+    }
+
+    if (unit.productLine === "STC") {
+        const pricingModel = unit.pricingModel;
+        const pricing = window.selectSgsStcProductPricing?.models?.[pricingModel];
+        const basePrice = pricing?.basePrices?.["A/HGC"];
+        if (!pricing || !Number.isFinite(basePrice)) return null;
+        return {
+            basePrice,
+            options: pricing.options ?? []
         };
     }
 
@@ -2242,7 +2255,7 @@ validateCostMultiplier();
 
 if (activeUnitNumber) {
     selectLineItem(activeUnitNumber);
-}
+he}
 
 updateUnitList();
 </script>
