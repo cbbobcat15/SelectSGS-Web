@@ -992,6 +992,24 @@ function getBtrAirUnitModelNumber(unit) {
     return `BTRD${materialCode}${reheatModelDigits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${unit.reheatCoil === "HGR" ? "-HGR" : ""}`;
 }
 
+// STC model number: <results-table model with coil material>-<feed><refrigerant>-<defrost method>,
+// e.g. STC4-43-BB with SS coil, Recirculated, R717, HGC and an insulated pan -> STC4B-43-BB-RBA-IHGC.
+function getStcModelNumber(unit) {
+    const materialCode = { AL: "A", SS: "B", CU: "C", HDG: "S" }[unit.coilMaterial];
+    const feedCode = { RECIRC: "RB", RECIRC_FLOODED: "RB", FLOODED: "FL", DX: "DX" }[unit.refrigerantFeed];
+    const refrigerantCode = { R717: "A" }[unit.refrigerant ?? "R717"];
+    const modelMatch = /^STC(\d+)-(.+)$/.exec(unit.model ?? "");
+    const panOptionId = unit.options?.find(option => isStcDrainPanOptionId(option.optionId))?.optionId;
+    const insulatedPanSelected = stcPanCoverOptionIds.includes(panOptionId);
+    const defrostCode = {
+        A: insulatedPanSelected ? "IA" : "A",
+        HGC: insulatedPanSelected ? "IHGC" : "HGC",
+        HTS: "HTS"
+    }[unit.defrostType];
+    if (!materialCode || !feedCode || !refrigerantCode || !modelMatch || !defrostCode) return "Unavailable";
+    return `STC${modelMatch[1]}${materialCode}-${modelMatch[2]}-${feedCode}${refrigerantCode}-${defrostCode}`;
+}
+
 function getBtrFanMotorHpValue(value) {
     if (Number.isFinite(value)) return value;
     if (typeof value !== "string") return null;
@@ -1146,6 +1164,8 @@ function renderUnitDetails(unitNumber) {
         modelValue.textContent = getBtrAirUnitModelNumber(unit);
         details.append(columns, model);
     } else if (isStc) {
+        model.querySelector("span").textContent = "Model Number";
+        modelValue.textContent = getStcModelNumber(unit);
         details.append(columns, model);
     } else {
         details.append(model, columns);
@@ -1696,7 +1716,9 @@ exportQuoteButton.addEventListener("click", async () => {
                 tag: row.querySelector('[data-unit-field="tag"]').value,
                 airUnitModelNumber: unit.productLine === "BTR"
                     ? getBtrAirUnitModelNumber(unit)
-                    : unit.model,
+                    : unit.productLine === "STC"
+                        ? getStcModelNumber(unit)
+                        : unit.model,
                 baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
                 cellCount: getUnitCellCount(unit),
                 options: [
@@ -2276,9 +2298,13 @@ optionsPanel.addEventListener("change", event => {
         } else {
             options[index].optionId = select.value;
         }
-        if (activeUnit.productLine === "BTR" && index === 0) {
+        if (usesEvaporatorOptionLayout(activeUnit) && index === 0) {
             const modelValue = document.querySelector("#unit-details-list .unit-detail-model strong");
-            if (modelValue) modelValue.textContent = getBtrAirUnitModelNumber(activeUnit);
+            if (modelValue) {
+                modelValue.textContent = activeUnit.productLine === "STC"
+                    ? getStcModelNumber(activeUnit)
+                    : getBtrAirUnitModelNumber(activeUnit);
+            }
         }
         saveQuotedUnits();
         updateQuotePrices();
