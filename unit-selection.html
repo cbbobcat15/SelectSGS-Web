@@ -598,6 +598,7 @@
                         <th scope="col">Face Vel<br>(FPM)</th>
                         <th scope="col">CFM</th>
                         <th scope="col">Fan HP</th>
+                        <th scope="col">Motor RPM</th>
                         <th scope="col">List Price</th>
                     </tr>
                 </thead>
@@ -1363,6 +1364,7 @@ function findStcUnits() {
             formatBtrNumber(unit.faceVelocity, 0),
             Number.isFinite(unit.airFlowCfm) ? unit.airFlowCfm.toLocaleString() : "N/A",
             unit.fanHp,
+            Number.isFinite(unit.motorRpm) ? unit.motorRpm.toLocaleString() : "N/A",
             unit.listPrice ? formatCurrency(unit.listPrice) : "N/A"
         ];
         for (const value of values) {
