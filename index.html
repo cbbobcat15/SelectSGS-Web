@@ -892,6 +892,7 @@
 <script src="btr-product-pricing.js?v=20261117-1600"></script>
 <script src="stc-ratings.js?v=20261123-1506"></script>
 <script src="stc-product-pricing.js?v=20261124-1850"></script>
+<script src="stc-dimensions.js?v=20261124-1850"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -1039,6 +1040,14 @@ function renderUnitDetails(unitNumber) {
     const fanMotorHp = fanMotorHpValue !== null
         ? `${fanMotorHpValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} HP`
         : undefined;
+    // STC fan motors are listed as "<fans> x <HP>"; show the per-fan rating like BTR.
+    const stcFanHpValue = isStc ? getBtrFanMotorHpValue(String(unit.fanHp ?? "").split("x").pop()) : null;
+    const stcFanMotorHp = stcFanHpValue !== null
+        ? `${stcFanHpValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} HP`
+        : undefined;
+    const stcDimensions = isStc
+        ? window.selectSgsStcDimensions?.[unit.model?.match(/^STC(\d)/)?.[1]]?.[unit.fanDiameterIn]?.[unit.rowsDeep]
+        : undefined;
     const primaryFields = isBtr ? [
         ["Number of AHU", unit.numberOfEvaporators],
         ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
@@ -1050,20 +1059,15 @@ function renderUnitDetails(unitNumber) {
         ["Fan motor(s)", fanMotorHp],
         ["Coil tube diameter", `3/4"`]
     ] : isStc ? [
-        ["Product line", "STC Evaporator"],
         ["Number of AHU", unit.numberOfEvaporators],
-        ["Coil material", { SS: "SS", AL: "AL", CU: "CU", HDG: "Steel HDG" }[unit.coilMaterial]],
-        ["Defrost type", { A: "A-Air", HGC: "HGC-Hot Gas Coil Only", HTS: "HTS-Hot Gas Unit (Series)" }[unit.defrostType] ?? "A-Air"],
-        ["Refrigerant", unit.refrigerant ?? "R717"],
-        ["Refrigerant feed", { DX: "DX", FLOODED: "Flooded", RECIRC: "Recirculated" }[unit.refrigerantFeed] ?? "Recirculated"],
-        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString()} BTUH/TD`],
-        ["Total TR per Unit", unit.coilCapacity == null || unit.targetTd == null
-            ? undefined
-            : (unit.coilCapacity * unit.targetTd / 12000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })} BTUH/TD`],
+        ["Req. tons per unit", Number.isFinite(tonsPerEvaporator) ? `${tonsPerEvaporator.toLocaleString()} TR` : undefined],
         ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
         ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
-        ["Rating condition", unit.coilRatingCondition],
-        ["Target coil temp", unit.targetCoilTemperature == null ? undefined : `${unit.targetCoilTemperature} °F`]
+        ["ESP", `0"`],
+        ["Fan diameter", unit.fanDiameterIn == null ? undefined : `${unit.fanDiameterIn}"`],
+        ["Fan motor(s)", stcFanMotorHp],
+        ["Coil tube diameter", `3/4"`]
     ] : [
         ["Product line", unit.productLine ?? "IEC"],
         ["# of cells", getUnitCellCount(unit)],
@@ -1093,17 +1097,16 @@ function renderUnitDetails(unitNumber) {
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
     ] : isStc ? [
-        ["Fan diameter", unit.fanDiameterIn == null ? undefined : `${unit.fanDiameterIn}"`],
-        ["Fan motor(s)", unit.fanHp],
         ["Motor speed", unit.motorRpm == null ? undefined : `${unit.motorRpm} RPM`],
+        ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
         ["Cooling rows deep", unit.rowsDeep == null ? undefined : `${unit.rowsDeep} RD`],
-        ["Fins per inch", unit.finsPerInch],
-        ["Coil face area", unit.faceAreaSqFt == null ? undefined : `${unit.faceAreaSqFt} sq. ft.`],
-        ["Coil surface area", unit.surfaceAreaSqFt == null ? undefined : `${unit.surfaceAreaSqFt.toLocaleString()} sq. ft.`],
-        ["Internal coil volume", unit.coilVolumeFt3 == null ? undefined : `${unit.coilVolumeFt3} ft³`],
-        ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString()} FPM`],
+        ["Fins per inch", unit.finsPerInch == null ? undefined : `${unit.finsPerInch} FPI`],
+        ["Total surface", unit.surfaceAreaSqFt == null ? undefined : `${unit.surfaceAreaSqFt.toLocaleString()} sq. ft.`],
+        ["Coil weight", unit.shippingWeightLb == null ? undefined : `${unit.shippingWeightLb.toLocaleString()} lb`],
         ["Air flow rate", unit.airFlowCfm == null ? undefined : `${unit.airFlowCfm.toLocaleString()} CFM`],
-        ["SS coil weight", unit.shippingWeightLb == null ? undefined : `${unit.shippingWeightLb.toLocaleString()} lb`]
+        ["Length", stcDimensions ? formatDimension(stcDimensions[0]) : undefined],
+        ["Width", stcDimensions ? formatDimension(stcDimensions[1]) : undefined],
+        ["Height", stcDimensions ? formatDimension(stcDimensions[2]) : undefined]
     ] : [
         ["Nominal box size", unit.nominalSize],
         ["Rated R717 capacity", `${unit.r717Tons?.toLocaleString(undefined, { maximumFractionDigits: 1 }) ?? "N/A"} Tons`],

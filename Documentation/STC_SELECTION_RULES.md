@@ -32,3 +32,5 @@ The STC ratings and correction factors are bundled in `stc-ratings.js` from the 
 
 
 STC prices are generated from the SGS price list workbook with `python3 -I tools/generate-stc-pricing.py PRICE_LIST.xlsx stc-product-pricing.js`. SS Casing, Insulated Pan Cover and SS Pan Cover prices depend only on coil material, number of fans and fan diameter, so each group's price applies to every model in it. The SS Pan Cover price is the Insulated Pan Cover price plus the SS Pan Cover price. SS fan guards are priced per unit by number of fans, per coil material.
+
+The quote page's Selected Unit panel for STC matches BTR: Number of AHU, Actual capacity, Req. tons per unit, Room temp, Delta T, ESP, Fan diameter, Fan motor(s) (per-fan HP), Coil tube diameter (3/4"), Motor speed, Face velocity, Cooling rows deep, Fins per inch, Total surface, Coil weight, Air flow rate, and Length/Width/Height. Dimensions come from page 27 of the STC technical PDF, bundled in `stc-dimensions.js` (rebuild with `python3 -I tools/generate-stc-dimensions.py SGS-STC-TECH-22.pdf stc-dimensions.js`).
