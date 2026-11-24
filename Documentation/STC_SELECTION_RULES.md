@@ -28,4 +28,8 @@ STC uses the evaporator design inputs and capacity-matching workflow used by BTR
 8. Exclude models that have no rating for the selected Wet or Frosted condition. Blank workbook cells are not inferred or filled.
 9. Select a result row and add the model to the quote. The selected defrost type determines the base price; A and HGC share the `A/HGC` price, while HTS uses its own price.
 
+<<<<<<< HEAD
 The STC ratings and correction factors are bundled in `stc-ratings.js` from the attached STC engineering data and correction-factor workbook. Results include catalog and corrected capacity, applied correction factor, capacity difference, face velocity, and fan horsepower. STC pricing is bundled in `stc-product-pricing.js`.
+=======
+The STC ratings and correction factors are bundled in `stc-ratings.js` from the attached STC engineering data and correction-factor workbook. Results include catalog and corrected capacity, applied correction factor, capacity difference, face velocity, and fan horsepower. STC selection requires a defrost type before results appear: A-Air, HGC-Hot Gas Coil Only, or HTS-Hot Gas Unit (Series). A and HGC use the shared `A/HGC` base price; HTS uses the `HTS` base price. STC base and option prices are bundled in `stc-product-pricing.js`. Selecting a result row enables Add to Quote, which returns the unit to the project information page. Options match the BTR layout: a drain pan selector (Standard, Insulated Pan Cover, SS Pan Cover), six selectable options, and three write-in rows, all priced per Unit and multiplied by the project cost multiplier.
+>>>>>>> d5e2f01c6533ef5d2a3593b59e028b35315a0ac3

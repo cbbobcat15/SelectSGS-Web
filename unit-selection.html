@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>SelectSGS Web | Unit Selection</title>
+    <script src="auth.js"></script>
+    <script>SelectSGSAuth.requireLogin();</script>
 
     <style>
         * {
@@ -359,6 +361,7 @@
 </head>
 
 <body>
+<script>SelectSGSAuth.mountUserBar();</script>
 
 <div class="container">
     <h1>SelectSGS Web</h1>
@@ -918,6 +921,8 @@ const stcSelectionFields = document.getElementById("stc-selection-fields");
 const stcCoilMaterialSelect = document.getElementById("stc-coil-material");
 const stcDefrostTypeSelect = document.getElementById("stc-defrost-type");
 const stcRefrigerantFeedSelect = document.getElementById("stc-refrigerant-feed");
+const stcDefrostTypeSelect = document.getElementById("stc-defrost-type");
+const getStcBasePriceKey = defrostType => defrostType === "HTS" ? "HTS" : "A/HGC";
 const stcFactorWarning = document.getElementById("stc-factor-warning");
 const stcResultsPanel = document.getElementById("stc-results-panel");
 const stcResultsRows = document.getElementById("stc-results-rows");
@@ -1211,12 +1216,12 @@ function findStcUnits() {
         return;
     }
 
-    const invalidSelectionInput = [stcCoilMaterialSelect, stcRefrigerantFeedSelect].find(input =>
+    const invalidSelectionInput = [stcCoilMaterialSelect, stcDefrostTypeSelect, stcRefrigerantFeedSelect].find(input =>
         !input.checkValidity()
     );
     if (invalidSelectionInput) {
         invalidSelectionInput.reportValidity();
-        stcResultsStatus.textContent = "Choose an STC coil material and R717 refrigerant feed.";
+        stcResultsStatus.textContent = "Choose an STC coil material, defrost type and R717 refrigerant feed.";
         return;
     }
     if (stcCoilMaterialSelect.value === "HDG" && stcRefrigerantFeedSelect.value === "DX") {
@@ -1248,6 +1253,7 @@ function findStcUnits() {
     const capacityKey = coilRatingCondition === "WET" ? "wetCapacityBtuhPerTd" : "frostedCapacityBtuhPerTd";
     const coilMaterial = stcCoilMaterialSelect.value;
     const refrigerantFeed = stcRefrigerantFeedSelect.value;
+    const defrostType = stcDefrostTypeSelect.value;
     const minimumDifference = Number(stcCapacityUnderInput.value);
     const maximumDifference = Number(stcCapacityOverInput.value);
     const maximumFaceVelocity = Number(roomTemperatureInput.value) > 34 ? 630 : Infinity;
@@ -1311,17 +1317,33 @@ function findStcUnits() {
             ? `STC${modelMatch[1]}${coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S"}-${modelMatch[2]}-${unit.fanDiameterIn === 24 ? "A" : modelMatch[3]}`
             : null;
         let listPrice = null;
+<<<<<<< HEAD
         if (pricingModel) {
             const pricingKey = stcDefrostTypeSelect.value === "HTS" ? "HTS" : "A/HGC";
             const basePrice = window.selectSgsStcProductPricing?.models?.[pricingModel]?.basePrices?.[pricingKey];
+=======
+        if (modelMatch) {
+            const [, fanCount, coilSize, fanCode] = modelMatch;
+            const coilCode = coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S";
+            const sheetFanCode = unit.fanDiameterIn === 24 ? "A" : fanCode;
+            const pricingModel = `STC${fanCount}${coilCode}-${coilSize}-${sheetFanCode}`;
+            const basePrice = window.selectSgsStcProductPricing?.models?.[pricingModel]?.basePrices?.[getStcBasePriceKey(defrostType)];
+>>>>>>> d5e2f01c6533ef5d2a3593b59e028b35315a0ac3
             listPrice = Number.isFinite(basePrice) ? basePrice : null;
         }
         return [{
             ...unit,
             coilMaterial,
             refrigerantFeed,
+<<<<<<< HEAD
             defrostType: stcDefrostTypeSelect.value,
             pricingModel,
+=======
+            defrostType,
+            pricingModel: modelMatch
+                ? `STC${modelMatch[1]}${coilMaterial === "AL" ? "A" : coilMaterial === "SS" ? "B" : coilMaterial === "CU" ? "C" : "S"}-${modelMatch[2]}-${unit.fanDiameterIn === 24 ? "A" : modelMatch[3]}`
+                : null,
+>>>>>>> d5e2f01c6533ef5d2a3593b59e028b35315a0ac3
             listPrice,
             coilCapacity,
             catalogCoilCapacity,
@@ -1549,6 +1571,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
             savedUnits[quoteUnitNumber] = {
                 ...selectedUnit,
                 productLine: "STC",
+                price: selectedUnit.listPrice,
                 cellCount: 1,
                 roomLoad: Number(roomLoadInput.value),
                 numberOfEvaporators: Number(numberOfEvaporatorsInput.value),
