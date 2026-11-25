@@ -1644,7 +1644,7 @@ function selectBtrUnit(model) {
         row.setAttribute("aria-selected", String(row.dataset.unitModel === model));
     }
     addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
-        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        quoteUnitNumber < 1 || quoteUnitNumber > 50;
 }
 
 function findStcUnits() {
@@ -1881,7 +1881,7 @@ function selectStcUnit(model) {
         row.setAttribute("aria-selected", String(row.dataset.unitModel === model));
     }
     addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
-        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        quoteUnitNumber < 1 || quoteUnitNumber > 50;
 }
 
 btrResultsRows.addEventListener("click", event => {
@@ -2153,7 +2153,7 @@ function selectCfUnit(key) {
         row.setAttribute("aria-selected", String(row.dataset.unitKey === key));
     }
     addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
-        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        quoteUnitNumber < 1 || quoteUnitNumber > 50;
 }
 
 cfResultsRows.addEventListener("click", event => {
@@ -2412,7 +2412,7 @@ function selectFlUnit(key) {
         row.setAttribute("aria-selected", String(row.dataset.unitKey === key));
     }
     addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
-        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        quoteUnitNumber < 1 || quoteUnitNumber > 50;
 }
 
 flResultsRows.addEventListener("click", event => {
@@ -2670,7 +2670,7 @@ function selectDtUnit(key) {
         row.setAttribute("aria-selected", String(row.dataset.unitKey === key));
     }
     addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
-        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        quoteUnitNumber < 1 || quoteUnitNumber > 50;
 }
 
 dtResultsRows.addEventListener("click", event => {
@@ -2736,7 +2736,7 @@ function renderMatchingUnits(result) {
             : "<p>No cell configurations match the selected capacity range.</p>"}
     `;
     document.getElementById("add-to-quote").disabled =
-        !selectedUnitModel || !selectedCellCount || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8;
+        !selectedUnitModel || !selectedCellCount || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50;
 }
 
 document.getElementById("result").addEventListener("click", event => {
@@ -2858,7 +2858,7 @@ function selectMatchingUnit(model, cellCount) {
 document.getElementById("add-to-quote").addEventListener("click", () => {
     if (activeProductLine === "CF") {
         const selectedUnit = cfMatchingUnits.find(unit => unit.key === selectedCfUnitKey);
-        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50) {
             return;
         }
 
@@ -2897,7 +2897,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
 
     if (activeProductLine === "DT") {
         const selectedUnit = dtMatchingUnits.find(unit => unit.key === selectedDtUnitKey);
-        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50) {
             return;
         }
 
@@ -2938,7 +2938,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
 
     if (activeProductLine === "FL") {
         const selectedUnit = flMatchingUnits.find(unit => unit.key === selectedFlUnitKey);
-        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50) {
             return;
         }
 
@@ -2977,7 +2977,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
 
     if (activeProductLine === "STC") {
         const selectedUnit = stcMatchingUnits.find(unit => unit.model === selectedStcUnitModel);
-        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50) {
             return;
         }
 
@@ -3015,7 +3015,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
 
     if (activeProductLine === "BTR") {
         const selectedUnit = btrMatchingUnits.find(unit => unit.model === selectedBtrUnitModel);
-        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50) {
             return;
         }
 
@@ -3057,7 +3057,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
     const selectedUnit = matchingUnits.find(unit =>
         unit.model === selectedUnitModel && unit.cellCount === selectedCellCount
     );
-    if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+    if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 50) {
         return;
     }
 
@@ -3196,7 +3196,7 @@ function findUnit() {
     renderMatchingUnits(result);
 }
 
-if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber <= 8) {
+if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber <= 50) {
     try {
         const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
         const savedUnit = savedUnits[quoteUnitNumber];
@@ -3326,7 +3326,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
 <script>
 try {
     const unitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
-    if (Number.isInteger(unitNumber) && unitNumber >= 1 && unitNumber <= 8) {
+    if (Number.isInteger(unitNumber) && unitNumber >= 1 && unitNumber <= 50) {
         const unitRows = JSON.parse(sessionStorage.getItem("selectsgs-unit-rows") || "[]");
         const unit = unitRows[unitNumber - 1] || {};
         const target = document.getElementById("unit-selection-target");
