@@ -2043,7 +2043,12 @@ function buildEvaporatorSpec(unit) {
             ratedCapacity: round(ratedCapacity, 0),
             btuhPerUnit: round(ratedBtuhPerUnit, 0),
             tonsTraditional: round(ratedBtuhPerUnit / 12000, 2),
-            tonsDtm: NA,
+            // DTM tons = (BTUH / (1 - BTUH / (2 x 60 x 0.24 x 0.083 x CFM x TD))) / 12000
+            tonsDtm: (() => {
+                const air = 2 * 60 * 0.24 * 0.083 * Number(airFlow) * targetTd;
+                const ratio = ratedBtuhPerUnit / air;
+                return Number.isFinite(ratio) && ratio < 1 ? round(ratedBtuhPerUnit / (1 - ratio) / 12000, 2) : NA;
+            })(),
             esp: unit.esp ?? 0,
             airFlow: orNA(airFlow),
             faceVelocity: round(Number(faceVelocity), 0)
