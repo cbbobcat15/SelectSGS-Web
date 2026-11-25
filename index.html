@@ -895,6 +895,7 @@
 <script src="stc-dimensions.js?v=20261124-1850"></script>
 <script src="cf-product-pricing.js?v=20261124-1900"></script>
 <script src="fl-product-pricing.js?v=20261124-1910"></script>
+<script src="dt-product-pricing.js?v=20261124-2000"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -928,6 +929,7 @@ const writeInOptionRows = document.getElementById("write-in-option-rows");
 const optionLineCount = 12;
 const btrSelectableOptionLineCount = 6;
 const cfSelectableOptionLineCount = 10;
+const dtSelectableOptionLineCount = 12;
 const writeInOptionCount = 3;
 const btrNoCoverOptionId = "btr-drain-pan-no-cover";
 const btrInsulatedCoverOptionId = "btr-drain-pan-ss-cover";
@@ -937,6 +939,9 @@ const stcPanCoverOptionIds = ["Insulated_Pan_Cover", "SS_Pan_Cover"];
 const cfStandardPanOptionId = "cf-drain-pan-standard";
 const cfPanCoverOptionIds = ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS", "CF_SS_Pan_Cover"];
 const cfInsulatedPanOptionIds = ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS"];
+const dtStandardPanOptionId = "dt-drain-pan-standard";
+const dtPanCoverOptionIds = ["DT_Pan_SS_Ins_Cover", "DT_Pan_Hygienic_IA", "DT_Pan_Hygienic_HG"];
+const dtInsulatedPanOptionIds = ["DT_Pan_SS_Ins_Cover", "DT_Pan_Hygienic_IA"];
 const hdgOptionId = "Internal_HDG_Plt";
 const legacyHdgOptionId = "hdg-internal-service-platform";
 const productPrices = window.selectSgsProductPricing?.models ?? {};
@@ -1041,8 +1046,38 @@ function getCfModelNumber(unit) {
     return `${unit.productLine}${unit.tube}${materialCode}${unit.fans}${unit.fanSize}-${rowsAndFpi}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${coating}`;
 }
 
+// DT/DTX model number: <DT|DTX|BT|BTX>D<material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>,
+// e.g. DTDS1-185-RBA-HGS or DTXDA3-881-DXA-IA-ERH-EF. A, HGC and ED become IA, IHGC and IED when an insulated pan
+// cover is selected; the Blow Thru option changes DT/DTX to BT/BTX.
+function isDtUnit(unit) {
+    return unit?.productLine === "DT";
+}
+
+function getDtModelNumber(unit) {
+    const materialCode = { AL: "A", SS: "B", CU: "C", HDG: "S" }[unit.coilMaterial];
+    const refrigerantCode = { R717: "A", R22: "V", R404A: "S", R507: "P" }[unit.refrigerant ?? "R717"];
+    const digits = /^(DTX?)-\d-(\d+)$/.exec(unit.model ?? "")?.[2];
+    if (!materialCode || !refrigerantCode || !digits || !unit.refrigerantFeed || !unit.defrostType) return "Unavailable";
+    const selectedIds = (unit.options ?? []).map(option => option.optionId);
+    const insulatedPanSelected = selectedIds.some(id => dtInsulatedPanOptionIds.includes(id));
+    const defrostCode = {
+        A: insulatedPanSelected ? "IA" : "A",
+        HGC: insulatedPanSelected ? "IHGC" : "HGC",
+        ED: insulatedPanSelected ? "IED" : "ED"
+    }[unit.defrostType] ?? unit.defrostType;
+    const reheat = selectedIds.includes("DT_Electric_Reheat") ? "-ERH" : selectedIds.includes("DT_Add_Hdrs_HGR") ? "-HGR" : "";
+    const coating = selectedIds.includes("DT_Electrofin") ? "-EF"
+        : selectedIds.includes("DT_Heresite") ? "-HC"
+        : selectedIds.includes("DT_Gold_Epoxy_Fins") ? "-GF" : "";
+    const series = unit.series === "DTX" ? "DTX" : "DT";
+    const prefix = selectedIds.includes("DT_Blow_Thru") ? series.replace("DT", "BT") : series;
+    return `${prefix}${unit.tube === "C" ? "C" : "D"}${materialCode}${unit.fans}-${digits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
+}
+
 function getEvaporatorModelNumber(unit) {
-    return isCfFamily(unit)
+    return isDtUnit(unit)
+        ? getDtModelNumber(unit)
+        : isCfFamily(unit)
         ? getCfModelNumber(unit)
         : unit.productLine === "STC"
             ? getStcModelNumber(unit)
@@ -1079,7 +1114,8 @@ function renderUnitDetails(unitNumber) {
     const isBtr = unit.productLine === "BTR";
     const isStc = unit.productLine === "STC";
     const isCf = isCfFamily(unit);
-    details.classList.toggle("unit-specifications--btr", isBtr || isStc || isCf);
+    const isDt = isDtUnit(unit);
+    details.classList.toggle("unit-specifications--btr", isBtr || isStc || isCf || isDt);
     const options = getUnitOptions(unit);
     renderOptionRows(options, unit);
     optionsPanel.hidden = false;
@@ -1120,6 +1156,16 @@ function renderUnitDetails(unitNumber) {
         ["Fan diameter", fanSpecifications ? `${fanSpecifications.diameterIn}"` : undefined],
         ["Fan motor(s)", fanMotorHp],
         ["Coil tube diameter", `3/4"`]
+    ] : isDt ? [
+        ["Number of AHU", unit.numberOfEvaporators],
+        ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })} BTUH/TD`],
+        ["Req. tons per unit", Number.isFinite(tonsPerEvaporator) ? `${tonsPerEvaporator.toLocaleString()} TR` : undefined],
+        ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
+        ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
+        ["ESP", `0"`],
+        ["Fan quantity", unit.fans],
+        ["Fan motor(s)", unit.fanHpText == null ? undefined : `${unit.fanHpText} HP`],
+        ["Coil tube diameter", unit.tube === "C" ? `5/8"` : `3/4"`]
     ] : isCf ? [
         ["Number of AHU", unit.numberOfEvaporators],
         ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })} BTUH/TD`],
@@ -1168,6 +1214,17 @@ function renderUnitDetails(unitNumber) {
         ["Length", dimensions ? formatDimension(dimensions.length) : undefined],
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
+    ] : isDt ? [
+        ["Fan size", `22"`],
+        ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
+        ["Cooling rows deep", unit.rowsDeep == null ? undefined : `${unit.rowsDeep} RD`],
+        ["Fins per inch", unit.finsPerInch == null ? undefined : `${unit.finsPerInch} FPI`],
+        ["Total surface", unit.surfaceAreaSqFt == null ? undefined : `${unit.surfaceAreaSqFt.toLocaleString()} sq. ft.`],
+        ["Coil weight", Number.isFinite(unit.coilWeightLb) ? `${unit.coilWeightLb.toLocaleString()} lb` : undefined],
+        ["Air flow rate", unit.airFlowCfm == null ? undefined : `${unit.airFlowCfm.toLocaleString()} CFM`],
+        ["Length", unit.dimensionsIn ? formatDimension(unit.dimensionsIn[0]) : undefined],
+        ["Width", unit.dimensionsIn ? formatDimension(unit.dimensionsIn[1]) : undefined],
+        ["Height", unit.dimensionsIn ? formatDimension(unit.dimensionsIn[2]) : undefined]
     ] : isCf ? [
         ["Fan size", unit.fanSize],
         ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
@@ -1228,9 +1285,9 @@ function renderUnitDetails(unitNumber) {
         model.querySelector("span").textContent = "Air Unit Model Number";
         modelValue.textContent = getBtrAirUnitModelNumber(unit);
         details.append(columns, model);
-    } else if (isStc || isCf) {
+    } else if (isStc || isCf || isDt) {
         model.querySelector("span").textContent = "Model Number";
-        modelValue.textContent = isCf ? getCfModelNumber(unit) : getStcModelNumber(unit);
+        modelValue.textContent = isDt ? getDtModelNumber(unit) : isCf ? getCfModelNumber(unit) : getStcModelNumber(unit);
         details.append(columns, model);
     } else {
         details.append(model, columns);
@@ -1388,7 +1445,7 @@ function getUnitProductFamily(unit) {
 
 function isPricedProductLine(unit) {
     return unit.productLine === "IEC" || unit.productLine === "DTC" ||
-        unit.productLine === "BTR" || unit.productLine === "STC" || isCfFamily(unit) ||
+        unit.productLine === "BTR" || unit.productLine === "STC" || isCfFamily(unit) || isDtUnit(unit) ||
         typeof unit.model === "string" && /^(IEC|DTC)-/.test(unit.model);
 }
 
@@ -1459,6 +1516,54 @@ function getProductPricing(unit) {
         };
     }
 
+    if (isDtUnit(unit)) {
+        const pricingData = window.selectSgsDtProductPricing;
+        const pricing = pricingData?.models?.[unit.pricingModel];
+        const defrostKey = { A: "A_HGC", HGC: "A_HGC", HGS: "HGS_HGP", HGP: "HGS_HGP", HTS: "HTS_HTP", HTP: "HTS_HTP", WD: "WD", ED: "ED", EDL: "EDL" }[unit.defrostType];
+        const basePrice = pricing?.basePrices?.[defrostKey];
+        if (!pricing || !Number.isFinite(basePrice)) return null;
+        // Insulated covers upgrade A, HGC and ED units; hot gas and EDL units already include a mill galvanized cover and
+        // can upgrade to the hygienic cover. Water defrost has no pan cover prices.
+        const insulatedCoverDefrost = ["A", "HGC", "ED"].includes(unit.defrostType);
+        const includedCover = ["HGS", "HGP", "HTS", "HTP", "EDL"].includes(unit.defrostType);
+        const panCoverOptions = unit.defrostType === "WD"
+            ? []
+            : insulatedCoverDefrost
+                ? ["DT_Pan_SS_Ins_Cover", "DT_Pan_Hygienic_IA"]
+                : ["DT_Pan_Hygienic_HG"];
+        const electricDefrost = ["ED", "EDL"].includes(unit.defrostType);
+        const sixRows = Number(unit.rowsDeep) === 6;
+        const isOptionApplicable = id => {
+            if (dtPanCoverOptionIds.includes(id)) return panCoverOptions.includes(id);
+            // Only gold epoxy fins can be combined with defrost heaters.
+            if (electricDefrost && ["DT_Electrofin", "DT_Heresite"].includes(id)) return false;
+            // Reheat is for aluminum and copper tube coils; electric reheat and blow thru are 6 row units only.
+            if (["DT_Electric_Reheat", "DT_Add_Hdrs_HGR"].includes(id) && !["AL", "CU"].includes(unit.coilMaterial)) return false;
+            if (["DT_Electric_Reheat", "DT_Blow_Thru"].includes(id) && !sixRows) return false;
+            // Blow thru units are for rooms above 20°F only.
+            if (id === "DT_Blow_Thru" && !(Number(unit.roomTemperature) > 20)) return false;
+            return true;
+        };
+        return {
+            basePrice,
+            options: [
+                {
+                    id: dtStandardPanOptionId,
+                    label: includedCover
+                        ? "Standard Drain Pan w/ Mill Galv. Insulated Cover (included)"
+                        : "Standard Drain Pan (no cover)",
+                    price: 0,
+                    uom: "per Unit"
+                },
+                ...pricingData.optionDefinitions.flatMap((definition, index) => {
+                    const price = pricing.options?.[index];
+                    if (!price || !isOptionApplicable(definition.id)) return [];
+                    return [{ ...definition, price, uom: "per Unit" }];
+                })
+            ]
+        };
+    }
+
     if (isCfFamily(unit)) {
         const pricingData = unit.productLine === "FL" ? window.selectSgsFlProductPricing : window.selectSgsCfProductPricing;
         const pricing = pricingData?.models?.[unit.pricingModel];
@@ -1513,6 +1618,7 @@ function getOptionUom(unit, pricing) {
 }
 
 function getUnitOptionLineCount(unit) {
+    if (isDtUnit(unit)) return dtSelectableOptionLineCount + 1;
     if (isCfFamily(unit)) return cfSelectableOptionLineCount + 1;
     return usesEvaporatorOptionLayout(unit) ? btrSelectableOptionLineCount + 1 : optionLineCount;
 }
@@ -1598,7 +1704,7 @@ function getUnitOptions(unit) {
         if (drainPanIndex === -1) unit.options[0].optionId = stcStandardPanOptionId;
     }
 
-    if (isCfFamily(unit)) {
+    if (isCfFamily(unit) || isDtUnit(unit)) {
         let hasDrainPanOption = false;
         for (const option of unit.options) {
             if (!isCfDrainPanOptionId(option.optionId)) continue;
@@ -1609,7 +1715,7 @@ function getUnitOptions(unit) {
         if (drainPanIndex > 0) {
             [unit.options[0], unit.options[drainPanIndex]] = [unit.options[drainPanIndex], unit.options[0]];
         }
-        if (drainPanIndex === -1) unit.options[0].optionId = cfStandardPanOptionId;
+        if (drainPanIndex === -1) unit.options[0].optionId = isDtUnit(unit) ? dtStandardPanOptionId : cfStandardPanOptionId;
     }
 
     return unit.options;
@@ -1618,11 +1724,12 @@ function getUnitOptions(unit) {
 // BTR and STC evaporators share one option layout: a single drain pan selector,
 // six selectable option rows, and three write-in rows.
 function usesEvaporatorOptionLayout(unit) {
-    return unit.productLine === "BTR" || unit.productLine === "STC" || isCfFamily(unit);
+    return unit.productLine === "BTR" || unit.productLine === "STC" || isCfFamily(unit) || isDtUnit(unit);
 }
 
 function isCfDrainPanOptionId(optionId) {
-    return optionId === cfStandardPanOptionId || cfPanCoverOptionIds.includes(optionId);
+    return optionId === cfStandardPanOptionId || cfPanCoverOptionIds.includes(optionId) ||
+        optionId === dtStandardPanOptionId || dtPanCoverOptionIds.includes(optionId);
 }
 
 function isStcDrainPanOptionId(optionId) {
@@ -1630,7 +1737,7 @@ function isStcDrainPanOptionId(optionId) {
 }
 
 function isDrainPanOptionId(unit, optionId) {
-    return isCfFamily(unit)
+    return isCfFamily(unit) || isDtUnit(unit)
         ? isCfDrainPanOptionId(optionId)
         : unit.productLine === "STC"
             ? isStcDrainPanOptionId(optionId)
@@ -1843,7 +1950,9 @@ exportQuoteButton.addEventListener("click", async () => {
                     ? getBtrAirUnitModelNumber(unit)
                     : unit.productLine === "STC"
                         ? getStcModelNumber(unit)
-                        : isCfFamily(unit)
+                        : isDtUnit(unit)
+                            ? getDtModelNumber(unit)
+                            : isCfFamily(unit)
                             ? getCfModelNumber(unit)
                             : unit.model,
                 baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
@@ -2449,7 +2558,7 @@ optionsPanel.addEventListener("change", event => {
         } else {
             options[index].optionId = select.value;
         }
-        if (usesEvaporatorOptionLayout(activeUnit) && (index === 0 || isCfFamily(activeUnit))) {
+        if (usesEvaporatorOptionLayout(activeUnit) && (index === 0 || isCfFamily(activeUnit) || isDtUnit(activeUnit))) {
             const modelValue = document.querySelector("#unit-details-list .unit-detail-model strong");
             if (modelValue) {
                 modelValue.textContent = getEvaporatorModelNumber(activeUnit);

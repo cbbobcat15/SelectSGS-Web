@@ -409,6 +409,7 @@
         <option value="STC">STC Evaporator</option>
         <option value="CF">CF Evaporator</option>
         <option value="FL">FL Evaporator</option>
+        <option value="DT">DT/DTX Evaporator</option>
     </select>
 
     <div id="condenser-inputs">
@@ -631,6 +632,49 @@
 
 
                 </section>
+                <section id="dt-selection-fields" aria-labelledby="dt-selection-heading" hidden>
+                    <h2 id="dt-selection-heading">DT/DTX Selection</h2>
+
+                    <label for="dt-refrigerant">Refrigerant</label>
+                    <select id="dt-refrigerant" required>
+                        <option value="R717" selected>R717</option>
+                        <option value="R22">R22</option>
+                        <option value="R404A">R404A</option>
+                        <option value="R507">R507</option>
+                    </select>
+
+                    <label for="dt-coil-material">Coil Material</label>
+                    <select id="dt-coil-material" required>
+                        <option value="" selected disabled>Select coil material</option>
+                        <option value="SS" data-dt-refrigerants="R717">SS</option>
+                        <option value="AL" data-dt-refrigerants="R717">AL</option>
+                        <option value="HDG" data-dt-refrigerants="R717">Steel HDG</option>
+                        <option value="CU" data-dt-refrigerants="R22 R404A R507">CU</option>
+                    </select>
+
+                    <label for="dt-defrost-type">Defrost Type</label>
+                    <select id="dt-defrost-type" required>
+                        <option value="" selected disabled>Select defrost type</option>
+                        <option value="A">A-Air Defrost</option>
+                        <option value="HGC">HGC-Hot Gas Coil Only</option>
+                        <option value="HGS">HGS-Hot Gas Unit, Waffle Pan (Series)</option>
+                        <option value="HGP">HGP-Hot Gas Unit, Waffle Pan (Parallel)</option>
+                        <option value="HTS">HTS-Hot Gas Unit, Tube Pan (Series)</option>
+                        <option value="HTP">HTP-Hot Gas Unit, Tube Pan (Parallel)</option>
+                        <option value="WD">WD-Water Defrost (6 Row Only)</option>
+                        <option value="ED">ED-Electric Defrost Coil Only</option>
+                        <option value="EDL">EDL-Electric Defrost Coil and Drain Pan</option>
+                    </select>
+
+                    <label for="dt-refrigerant-feed">Refrigerant Feed</label>
+                    <select id="dt-refrigerant-feed" required>
+                        <option value="" selected disabled>Select refrigerant feed</option>
+                        <option value="RB">RB-Recirc Bottom</option>
+                        <option value="RT">RT-Recirc Top</option>
+                        <option value="FL">FL-Flooded</option>
+                        <option value="DX">DX</option>
+                    </select>
+                </section>
             </div>
 
             <section id="btr-derived-values" class="btr-derived-values" aria-labelledby="btr-derived-heading" hidden>
@@ -836,7 +880,7 @@
                         <th scope="col" data-fl-sort="coilCapacity" aria-sort="none"><button type="button" class="stc-sort-button" data-fl-sort-button="coilCapacity">Coil Cap<br>BTUH/TD</button></th>
                         <th scope="col" data-fl-sort="capacityDifference" aria-sort="none"><button type="button" class="stc-sort-button" data-fl-sort-button="capacityDifference">Cap % Diff</button></th>
                         <th scope="col" data-fl-sort="faceVelocity" aria-sort="none"><button type="button" class="stc-sort-button" data-fl-sort-button="faceVelocity">Face Vel<br>(FPM)</button></th>
-                        <th scope="col" data-fl-sort="airFlowCfm" aria-sort="none"><button type="button" class="stc-sort-button" data-fl-sort-button="airFlowCfm">FLM</button></th>
+                        <th scope="col" data-fl-sort="airFlowCfm" aria-sort="none"><button type="button" class="stc-sort-button" data-fl-sort-button="airFlowCfm">CFM</button></th>
                         <th scope="col" data-fl-sort="fanHpTotal" aria-sort="none"><button type="button" class="stc-sort-button" data-fl-sort-button="fanHpTotal">Fan HP</button></th>
                         <th scope="col" data-fl-sort="listPrice" aria-sort="ascending"><button type="button" class="stc-sort-button" data-fl-sort-button="listPrice">List Price</button></th>
                     </tr>
@@ -845,6 +889,78 @@
             </table>
         </div>
         <p id="fl-results-status" role="status">Click Find Units to search matching coils.</p>
+    </section>
+
+    <section id="dt-results-panel" class="btr-results-panel" aria-labelledby="dt-results-heading" hidden>
+        <div class="btr-results-heading-row">
+            <h2 id="dt-results-heading">4. Select Unit</h2>
+            <h3>Filters</h3>
+        </div>
+        <div class="btr-results-toolbar">
+            <button id="dt-find-units" type="button">Find Units</button>
+            <div class="btr-result-filters">
+                <div class="btr-result-filter">
+                    <label for="dt-capacity-under">Cap % Under</label>
+                    <input id="dt-capacity-under" type="number" min="-100" max="0" step="any" value="-15" required>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="dt-capacity-over">Cap % Over</label>
+                    <input id="dt-capacity-over" type="number" min="0" step="any" value="15" required>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="dt-fpi-filter">FPI</label>
+                    <select id="dt-fpi-filter">
+                        <option value="" selected>All</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="dt-rows-filter">Rows Deep</label>
+                    <select id="dt-rows-filter">
+                        <option value="" selected>All</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                    </select>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="dt-tube-filter">Tube Diameter</label>
+                    <select id="dt-tube-filter">
+                        <option value="" selected>All</option>
+                        <option value="D">3/4"</option>
+                        <option value="C">5/8"</option>
+                    </select>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="dt-series-filter">Series</label>
+                    <select id="dt-series-filter">
+                        <option value="" selected>All</option>
+                        <option value="DT">DT</option>
+                        <option value="DTX">DTX</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="btr-results-table-wrapper">
+            <table class="btr-results-table">
+                <thead>
+                    <tr id="dt-results-header">
+                        <th scope="col" data-dt-sort="model" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="model">Model</button></th>
+                        <th scope="col" data-dt-sort="rowsDeep" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="rowsDeep">Rows</button></th>
+                        <th scope="col" data-dt-sort="finsPerInch" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="finsPerInch">FPI</button></th>
+                        <th scope="col" data-dt-sort="coilCapacity" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="coilCapacity">Coil Cap<br>BTUH/TD</button></th>
+                        <th scope="col" data-dt-sort="capacityDifference" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="capacityDifference">Cap % Diff</button></th>
+                        <th scope="col" data-dt-sort="faceVelocity" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="faceVelocity">Face Vel<br>(FPM)</button></th>
+                        <th scope="col" data-dt-sort="airFlowCfm" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="airFlowCfm">CFM</button></th>
+                        <th scope="col" data-dt-sort="fanHpTotal" aria-sort="none"><button type="button" class="stc-sort-button" data-dt-sort-button="fanHpTotal">Fan HP</button></th>
+                        <th scope="col" data-dt-sort="listPrice" aria-sort="ascending"><button type="button" class="stc-sort-button" data-dt-sort-button="listPrice">List Price</button></th>
+                    </tr>
+                </thead>
+                <tbody id="dt-results-rows"></tbody>
+            </table>
+        </div>
+        <p id="dt-results-status" role="status">Click Find Units to search matching coils.</p>
     </section>
 
     <div id="unit-selection-actions" class="action-bar">
@@ -868,6 +984,8 @@
 <script src="cf-product-pricing.js?v=20261124-1900"></script>
 <script src="fl-ratings.js?v=20261124-1910"></script>
 <script src="fl-product-pricing.js?v=20261124-1910"></script>
+<script src="dt-ratings.js?v=20261124-2000"></script>
+<script src="dt-product-pricing.js?v=20261124-2000"></script>
 <script>
 
 const wetBulbTemperatures = [
@@ -1200,6 +1318,8 @@ const cfCapacityUnderInput = document.getElementById("cf-capacity-under");
 const cfCapacityOverInput = document.getElementById("cf-capacity-over");
 const cfFpiFilterSelect = document.getElementById("cf-fpi-filter");
 let flMatchingUnits = [];
+let dtMatchingUnits = [];
+let selectedDtUnitKey = null;
 let selectedFlUnitKey = null;
 const flSelectionFields = document.getElementById("fl-selection-fields");
 const flRefrigerantSelect = document.getElementById("fl-refrigerant");
@@ -1214,6 +1334,20 @@ const flResultsStatus = document.getElementById("fl-results-status");
 const flCapacityUnderInput = document.getElementById("fl-capacity-under");
 const flCapacityOverInput = document.getElementById("fl-capacity-over");
 const flFpiFilterSelect = document.getElementById("fl-fpi-filter");
+const dtSelectionFields = document.getElementById("dt-selection-fields");
+const dtRefrigerantSelect = document.getElementById("dt-refrigerant");
+const dtCoilMaterialSelect = document.getElementById("dt-coil-material");
+const dtDefrostTypeSelect = document.getElementById("dt-defrost-type");
+const dtRefrigerantFeedSelect = document.getElementById("dt-refrigerant-feed");
+const dtResultsPanel = document.getElementById("dt-results-panel");
+const dtResultsRows = document.getElementById("dt-results-rows");
+const dtResultsStatus = document.getElementById("dt-results-status");
+const dtCapacityUnderInput = document.getElementById("dt-capacity-under");
+const dtCapacityOverInput = document.getElementById("dt-capacity-over");
+const dtFpiFilterSelect = document.getElementById("dt-fpi-filter");
+const dtRowsFilterSelect = document.getElementById("dt-rows-filter");
+const dtSeriesFilterSelect = document.getElementById("dt-series-filter");
+const dtTubeFilterSelect = document.getElementById("dt-tube-filter");
 const unitSelectionActions = document.getElementById("unit-selection-actions");
 const findUnitButton = document.getElementById("find-unit");
 const addToQuoteButton = document.getElementById("add-to-quote");
@@ -1255,11 +1389,12 @@ function areBtrDesignInputsPopulated() {
 
 function updateBtrSelectionVisibility() {
     const designInputsPopulated = areBtrDesignInputsPopulated();
-    const showAdditionalFields = ["BTR", "STC", "CF", "FL"].includes(activeProductLine) && designInputsPopulated;
+    const showAdditionalFields = ["BTR", "STC", "CF", "FL", "DT"].includes(activeProductLine) && designInputsPopulated;
     btrSelectionFields.hidden = activeProductLine !== "BTR" || !showAdditionalFields;
     stcSelectionFields.hidden = activeProductLine !== "STC" || !showAdditionalFields;
     cfSelectionFields.hidden = activeProductLine !== "CF" || !showAdditionalFields;
     flSelectionFields.hidden = activeProductLine !== "FL" || !showAdditionalFields;
+    dtSelectionFields.hidden = activeProductLine !== "DT" || !showAdditionalFields;
     btrDerivedValues.hidden = !showAdditionalFields;
     const selectionsComplete = activeProductLine !== "BTR" ||
         [...btrSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
@@ -1277,13 +1412,15 @@ function updateBtrSelectionVisibility() {
     cfResultsPanel.hidden = activeProductLine !== "CF" || !showAdditionalFields || !cfSelectionsComplete;
     const flSelectionsComplete = [...flSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
     flResultsPanel.hidden = activeProductLine !== "FL" || !showAdditionalFields || !flSelectionsComplete;
+    const dtSelectionsComplete = [...dtSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
+    dtResultsPanel.hidden = activeProductLine !== "DT" || !showAdditionalFields || !dtSelectionsComplete;
     if (!showAdditionalFields) return;
 
     const roomTemperature = Number(roomTemperatureInput.value);
     const targetTd = Number(targetTdInput.value);
     const targetCoilTemperature = roomTemperature - targetTd;
     document.getElementById("coil-rating-condition").textContent =
-        targetCoilTemperature > 25 ? "WET" : "Frosted";
+        (activeProductLine === "DT" ? targetCoilTemperature >= 25 : targetCoilTemperature > 25) ? "WET" : "Frosted";
     document.getElementById("max-face-velocity").textContent =
         roomTemperature > 34 ? "630" : "N/A";
     document.getElementById("target-coil-temperature").textContent = formatBtrNumber(targetCoilTemperature);
@@ -1316,6 +1453,14 @@ function clearFlResults() {
     addToQuoteButton.disabled = true;
 }
 
+function clearDtResults() {
+    dtMatchingUnits = [];
+    selectedDtUnitKey = null;
+    dtResultsRows.replaceChildren();
+    dtResultsStatus.textContent = "Click Find Units to refresh the results.";
+    addToQuoteButton.disabled = true;
+}
+
 function clearStcResults() {
     stcMatchingUnits = [];
     selectedStcUnitModel = null;
@@ -1325,15 +1470,16 @@ function clearStcResults() {
 }
 
 function setProductLine(productLine) {
-    activeProductLine = ["IEC", "DTC", "BTR", "STC", "CF", "FL"].includes(productLine) ? productLine : "IEC";
+    activeProductLine = ["IEC", "DTC", "BTR", "STC", "CF", "FL", "DT"].includes(productLine) ? productLine : "IEC";
     productLineSelect.value = activeProductLine;
-    const isEvaporator = ["BTR", "STC", "CF", "FL"].includes(activeProductLine);
+    const isEvaporator = ["BTR", "STC", "CF", "FL", "DT"].includes(activeProductLine);
     condenserInputs.hidden = isEvaporator;
     btrInputs.hidden = !isEvaporator;
     btrResultsPanel.hidden = true;
     stcResultsPanel.hidden = true;
     cfResultsPanel.hidden = true;
     flResultsPanel.hidden = true;
+    dtResultsPanel.hidden = true;
     unitSelectionActions.hidden = false;
     findUnitButton.hidden = isEvaporator;
     document.getElementById("result").hidden = isEvaporator;
@@ -2040,7 +2186,7 @@ function interpolateFlFactor(pointsByVelocity, rowsDeep, faceVelocity) {
     return lowerFactor + (upperFactor - lowerFactor) * (faceVelocity - lower) / (upper - lower);
 }
 
-// Base price is at the row's standard motor HP; other motor sizes add the "FL FL Std Mtr Adds" difference per motor.
+// Base price is at the row's standard motor HP; other motor sizes add the "CF FL Std Mtr Adds" difference per motor.
 function getFlBasePrice(pricing, defrostType, fans, fanHp) {
     const basePrice = pricing?.basePrices?.[flDefrostPriceKeys[defrostType]];
     if (!Number.isFinite(basePrice)) return null;
@@ -2282,6 +2428,264 @@ flResultsRows.addEventListener("keydown", event => {
     }
 });
 
+const dtRefrigerantCodes = { R717: "A", R22: "V", R404A: "S", R507: "P" };
+const dtCoilMaterialCodes = { AL: "A", SS: "B", CU: "C", HDG: "S" };
+const dtDefrostPriceKeys = { A: "A_HGC", HGC: "A_HGC", HGS: "HGS_HGP", HGP: "HGS_HGP", HTS: "HTS_HTP", HTP: "HTS_HTP", WD: "WD", ED: "ED", EDL: "EDL" };
+
+// Copper tube coils cannot be used with ammonia, so R717 offers SS, AL and Steel HDG and the halocarbons offer CU only.
+// Steel coils have no electric defrost prices.
+function syncDtSelectionOptions() {
+    const refrigerant = dtRefrigerantSelect.value;
+    for (const option of dtCoilMaterialSelect.options) {
+        if (!option.dataset.dtRefrigerants) continue;
+        const allowed = option.dataset.dtRefrigerants.split(" ").includes(refrigerant);
+        option.hidden = !allowed;
+        option.disabled = !allowed;
+    }
+    if (dtCoilMaterialSelect.selectedOptions[0]?.disabled) dtCoilMaterialSelect.value = "";
+    const steel = dtCoilMaterialSelect.value === "HDG";
+    for (const option of dtDefrostTypeSelect.options) {
+        if (option.value === "ED" || option.value === "EDL") option.disabled = steel;
+    }
+    if (dtDefrostTypeSelect.selectedOptions[0]?.disabled && dtDefrostTypeSelect.value) dtDefrostTypeSelect.value = "";
+}
+
+syncDtSelectionOptions();
+
+// Section 1.6: factor for DX-frosted ratings at low suction temperature, linear between the table points.
+function getDtLowSuctionFactor(coilTemperature) {
+    const points = window.selectSgsDtCapacityCorrections.lowSuctionTemperaturePoints;
+    if (coilTemperature >= points[0][0]) return 1;
+    for (let index = 1; index < points.length; index++) {
+        const [lowerTemperature, lowerFactor] = points[index];
+        const [upperTemperature, upperFactor] = points[index - 1];
+        if (coilTemperature >= lowerTemperature) {
+            return lowerFactor + (upperFactor - lowerFactor) * (coilTemperature - lowerTemperature) / (upperTemperature - lowerTemperature);
+        }
+    }
+    return undefined;
+}
+
+function findDtUnits() {
+    dtMatchingUnits = [];
+    selectedDtUnitKey = null;
+    addToQuoteButton.disabled = true;
+    dtResultsRows.replaceChildren();
+    const invalidDesignInput = btrDesignInputs.find(input => !input.checkValidity());
+    if (invalidDesignInput) {
+        invalidDesignInput.reportValidity();
+        dtResultsStatus.textContent = "Enter valid values for all four DT/DTX design inputs.";
+        return;
+    }
+    if (!areBtrDesignInputsPopulated()) {
+        dtResultsStatus.textContent = "Enter Room Load and Target TD to search for DT/DTX units.";
+        return;
+    }
+    const selections = [dtRefrigerantSelect, dtCoilMaterialSelect, dtDefrostTypeSelect, dtRefrigerantFeedSelect];
+    const invalidSelectionInput = selections.find(input => !input.checkValidity());
+    if (invalidSelectionInput) {
+        invalidSelectionInput.reportValidity();
+        dtResultsStatus.textContent = "Choose a DT/DTX refrigerant, coil material, defrost type and refrigerant feed.";
+        return;
+    }
+    const invalidFilterInput = [dtCapacityUnderInput, dtCapacityOverInput].find(input =>
+        !input.checkValidity() || input.value.trim() === ""
+    );
+    if (invalidFilterInput) {
+        invalidFilterInput.reportValidity();
+        dtResultsStatus.textContent = "Enter valid capacity tolerance filters.";
+        return;
+    }
+
+    const roomLoad = Number(roomLoadInput.value);
+    const targetTd = Number(targetTdInput.value);
+    const evaporatorCount = Number(numberOfEvaporatorsInput.value);
+    const targetCapacity = roomLoad * 12000 / targetTd / evaporatorCount;
+    if (!Number.isFinite(targetCapacity) || targetCapacity <= 0) {
+        dtResultsStatus.textContent = "Enter a Room Load and Target TD that produce a positive target capacity per coil.";
+        return;
+    }
+    const availableUnits = window.selectSgsDtRatings;
+    const pricingData = window.selectSgsDtProductPricing;
+    if (!Array.isArray(availableUnits) || availableUnits.length === 0 || !window.selectSgsDtCapacityCorrections || !pricingData) {
+        dtResultsStatus.textContent = "DT/DTX rating data could not be loaded. Refresh the page and try again.";
+        console.error("DT rating, correction or pricing data could not be loaded.");
+        return;
+    }
+
+    // Wet ratings are valid at suction temperatures of 25°F and above; frosted ratings below 25°F (ES 14602.6 section 1.8.7).
+    const roomTemperature = Number(roomTemperatureInput.value);
+    const targetCoilTemperature = roomTemperature - targetTd;
+    const coilRatingCondition = targetCoilTemperature >= 25 ? "WET" : "Frosted";
+    if (targetCoilTemperature < -50) {
+        dtResultsStatus.textContent = "DT/DTX ratings are not available for suction temperatures below -50°F.";
+        return;
+    }
+    const coilMaterial = dtCoilMaterialSelect.value;
+    const refrigerantFeed = dtRefrigerantFeedSelect.value;
+    const defrostType = dtDefrostTypeSelect.value;
+    const ratingKey = (coilRatingCondition === "WET" ? "wet" : "frosted") + (refrigerantFeed === "DX" ? "Dx" : "Rec");
+    const minimumDifference = Number(dtCapacityUnderInput.value);
+    const maximumDifference = Number(dtCapacityOverInput.value);
+    const fpiFilter = dtFpiFilterSelect.value === "" ? null : Number(dtFpiFilterSelect.value);
+    const rowsFilter = dtRowsFilterSelect.value === "" ? null : Number(dtRowsFilterSelect.value);
+    const seriesFilter = dtSeriesFilterSelect.value;
+    const tubeFilter = dtTubeFilterSelect.value;
+    const maximumFaceVelocity = roomTemperature > 34 ? 630 : Infinity;
+    // Only DX-frosted ratings are corrected for low suction temperature.
+    const lowSuctionFactor = coilRatingCondition === "Frosted" && refrigerantFeed === "DX"
+        ? getDtLowSuctionFactor(targetCoilTemperature)
+        : 1;
+    if (!Number.isFinite(lowSuctionFactor)) {
+        dtResultsStatus.textContent = "The DT/DTX low suction temperature correction factor could not be determined.";
+        return;
+    }
+
+    dtMatchingUnits = availableUnits.flatMap(unit => {
+        // 5/8" tube units are stainless only; other materials are 3/4" tube.
+        if (!Number.isFinite(unit.weightsLb?.[coilMaterial]) || tubeFilter && unit.tube !== tubeFilter) return [];
+        if (seriesFilter && unit.series !== seriesFilter) return [];
+        if (fpiFilter !== null && unit.finsPerInch !== fpiFilter) return [];
+        if (rowsFilter !== null && unit.rowsDeep !== rowsFilter) return [];
+        const ratedCapacity = unit[ratingKey];
+        if (!Number.isFinite(ratedCapacity) || !Number.isFinite(unit.faceVelocityFpm)) return [];
+        if (unit.faceVelocityFpm > maximumFaceVelocity) return [];
+        const appliedCapacityCorrections = lowSuctionFactor === 1
+            ? []
+            : [{ label: "Low suction temperature (DX frosted)", factor: lowSuctionFactor }];
+        const coilCapacity = ratedCapacity * lowSuctionFactor;
+        const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
+        if (capacityDifference < minimumDifference || capacityDifference > maximumDifference) return [];
+
+        const pricingModel = `${unit.series}${unit.tube === "C" ? "5" : ""}${dtCoilMaterialCodes[coilMaterial]}${unit.fans}-${unit.model.split("-")[1]}`;
+        const pricing = pricingData.models[pricingModel];
+        const listPrice = pricing?.basePrices?.[dtDefrostPriceKeys[defrostType]];
+        // Units that cannot be priced for the selected material and defrost type are not offered.
+        if (!Number.isFinite(listPrice)) return [];
+        return [{
+            ...unit,
+            model: `${unit.series}-${unit.model}`,
+            key: `${unit.series}|${unit.model}|${unit.tube}`,
+            coilMaterial,
+            refrigerant: dtRefrigerantSelect.value,
+            refrigerantFeed,
+            defrostType,
+            pricingModel,
+            listPrice,
+            coilCapacity,
+            capacityCorrectionFactor: lowSuctionFactor,
+            appliedCapacityCorrections,
+            capacityDifference,
+            coilRatingCondition,
+            faceVelocity: unit.faceVelocityFpm,
+            fanHpTotal: unit.fans * unit.fanHp,
+            fanHpLabel: `${unit.fans} x ${unit.fanHpText}`,
+            coilWeightLb: unit.weightsLb[coilMaterial],
+            esp: 0,
+            dimensionsIn: window.selectSgsDtDimensions?.[unit.series]?.[String(unit.fans)] ?? null
+        }];
+    });
+
+    renderDtResultsRows();
+    const dtNotes = [
+        targetTd > 20 ? "DT/DTX ratings are valid for TDs of 20°F or less." : "",
+        dtMatchingUnits.some(unit => unit.tube === "C")
+            ? "5/8\" tube air flow, face velocity and surface area are copied from the 3/4\" coil and are pending factory review." : ""
+    ].filter(Boolean);
+    dtResultsStatus.textContent = dtMatchingUnits.length
+        ? dtNotes.length ? `Note: ${dtNotes.join(" ")}` : ""
+        : `No DT/DTX coils match the selected capacity range and ${coilRatingCondition} rating condition.`;
+}
+
+let dtSortKey = "listPrice";
+let dtSortDirection = "asc";
+
+function getDtSortValue(unit, key) {
+    if (key === "model") return unit.model;
+    const value = unit[key];
+    return Number.isFinite(value) && !(key === "listPrice" && !value) ? value : null;
+}
+
+function renderDtResultsRows() {
+    const direction = dtSortDirection === "asc" ? 1 : -1;
+    const sortedUnits = [...dtMatchingUnits].sort((first, second) => {
+        const firstValue = getDtSortValue(first, dtSortKey);
+        const secondValue = getDtSortValue(second, dtSortKey);
+        if (firstValue === null && secondValue === null) return 0;
+        if (firstValue === null) return 1;
+        if (secondValue === null) return -1;
+        const comparison = typeof firstValue === "string"
+            ? firstValue.localeCompare(secondValue, undefined, { numeric: true })
+            : firstValue - secondValue;
+        return comparison * direction || first.key.localeCompare(second.key, undefined, { numeric: true });
+    });
+    for (const header of document.querySelectorAll("#dt-results-header th")) {
+        header.setAttribute("aria-sort", header.dataset.dtSort !== dtSortKey
+            ? "none"
+            : dtSortDirection === "asc" ? "ascending" : "descending");
+    }
+    dtResultsRows.replaceChildren();
+    for (const unit of sortedUnits) {
+        const row = document.createElement("tr");
+        row.dataset.unitKey = unit.key;
+        row.tabIndex = 0;
+        row.setAttribute("aria-selected", String(unit.key === selectedDtUnitKey));
+        const values = [
+            unit.model,
+            unit.rowsDeep,
+            unit.finsPerInch,
+            formatBtrNumber(unit.coilCapacity, 0),
+            `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
+            formatBtrNumber(unit.faceVelocity, 0),
+            Number.isFinite(unit.airFlowCfm) ? unit.airFlowCfm.toLocaleString() : "N/A",
+            unit.fanHpLabel,
+            unit.listPrice ? formatCurrency(unit.listPrice) : "N/A"
+        ];
+        for (const value of values) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.append(cell);
+        }
+        dtResultsRows.append(row);
+    }
+}
+
+document.getElementById("dt-results-header").addEventListener("click", event => {
+    const button = event.target.closest("[data-dt-sort-button]");
+    if (!button) return;
+    const key = button.dataset.dtSortButton;
+    if (key === dtSortKey) {
+        dtSortDirection = dtSortDirection === "asc" ? "desc" : "asc";
+    } else {
+        dtSortKey = key;
+        dtSortDirection = "asc";
+    }
+    renderDtResultsRows();
+});
+
+function selectDtUnit(key) {
+    if (!dtMatchingUnits.some(unit => unit.key === key)) return;
+    selectedDtUnitKey = key;
+    for (const row of dtResultsRows.rows) {
+        row.setAttribute("aria-selected", String(row.dataset.unitKey === key));
+    }
+    addToQuoteButton.disabled = !Number.isInteger(quoteUnitNumber) ||
+        quoteUnitNumber < 1 || quoteUnitNumber > 8;
+}
+
+dtResultsRows.addEventListener("click", event => {
+    const row = event.target.closest("tr[data-unit-key]");
+    if (row) selectDtUnit(row.dataset.unitKey);
+});
+
+dtResultsRows.addEventListener("keydown", event => {
+    if ((event.key === "Enter" || event.key === " ") &&
+        event.target.matches("tr[data-unit-key]")) {
+        event.preventDefault();
+        selectDtUnit(event.target.dataset.unitKey);
+    }
+});
+
 function renderMatchingUnits(result) {
     const { minimumCapacity, maximumCapacity, correctionFactor } = currentResultDetails;
     const resultColumns = getResultColumns();
@@ -2368,6 +2772,7 @@ productLineSelect.addEventListener("change", () => {
     clearStcResults();
     clearCfResults();
     clearFlResults();
+    clearDtResults();
     selectedUnitModel = null;
     selectedCellCount = null;
     matchingUnits = [];
@@ -2384,10 +2789,12 @@ productLineSelect.addEventListener("change", () => {
             ? "Enter the CF design conditions and click Find Units."
             : activeProductLine === "FL"
             ? "Enter the FL design conditions and click Find Units."
+            : activeProductLine === "DT"
+            ? "Enter the DT/DTX design conditions and click Find Units."
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter, #cf-refrigerant, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-capacity-under, #cf-capacity-over, #cf-fpi-filter, #cf-tube-filter, #fl-refrigerant, #fl-coil-material, #fl-defrost-type, #fl-refrigerant-feed, #fl-esp, #fl-capacity-under, #fl-capacity-over, #fl-fpi-filter, #fl-tube-filter")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter, #cf-refrigerant, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-capacity-under, #cf-capacity-over, #cf-fpi-filter, #cf-tube-filter, #fl-refrigerant, #fl-coil-material, #fl-defrost-type, #fl-refrigerant-feed, #fl-esp, #fl-capacity-under, #fl-capacity-over, #fl-fpi-filter, #fl-tube-filter, #dt-refrigerant, #dt-coil-material, #dt-defrost-type, #dt-refrigerant-feed, #dt-capacity-under, #dt-capacity-over, #dt-fpi-filter, #dt-rows-filter, #dt-series-filter, #dt-tube-filter")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -2400,6 +2807,7 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 clearStcResults();
                 clearCfResults();
                 clearFlResults();
+                clearDtResults();
             } else if (input.matches("#btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil")) {
                 updateBtrSelectionVisibility();
                 clearBtrResults();
@@ -2420,6 +2828,12 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 clearFlResults();
             } else if (input.matches("#fl-capacity-under, #fl-capacity-over, #fl-fpi-filter, #fl-tube-filter")) {
                 clearFlResults();
+            } else if (input.matches("#dt-refrigerant, #dt-coil-material, #dt-defrost-type, #dt-refrigerant-feed")) {
+                syncDtSelectionOptions();
+                updateBtrSelectionVisibility();
+                clearDtResults();
+            } else if (input.matches("#dt-capacity-under, #dt-capacity-over, #dt-fpi-filter, #dt-rows-filter, #dt-series-filter, #dt-tube-filter")) {
+                clearDtResults();
             }
             if (!selectedUnitModel) return;
             selectedUnitModel = null;
@@ -2433,6 +2847,7 @@ document.getElementById("btr-find-units").addEventListener("click", findBtrUnits
 document.getElementById("stc-find-units").addEventListener("click", findStcUnits);
 document.getElementById("cf-find-units").addEventListener("click", findCfUnits);
 document.getElementById("fl-find-units").addEventListener("click", findFlUnits);
+document.getElementById("dt-find-units").addEventListener("click", findDtUnits);
 
 function selectMatchingUnit(model, cellCount) {
     selectedUnitModel = model;
@@ -2476,6 +2891,47 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
         } catch (error) {
             cfResultsStatus.textContent = "The selected CF unit could not be added to the quote. Check your browser storage settings and try again.";
             console.error("Could not save selected CF unit to quote.", error);
+        }
+        return;
+    }
+
+    if (activeProductLine === "DT") {
+        const selectedUnit = dtMatchingUnits.find(unit => unit.key === selectedDtUnitKey);
+        if (!selectedUnit || !Number.isInteger(quoteUnitNumber) || quoteUnitNumber < 1 || quoteUnitNumber > 8) {
+            return;
+        }
+
+        try {
+            const savedUnits = JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}");
+            const unitRows = JSON.parse(sessionStorage.getItem("selectsgs-unit-rows") || "[]");
+            const unitRow = unitRows[quoteUnitNumber - 1] || {};
+            const roomTemperature = Number(roomTemperatureInput.value);
+            const targetTd = Number(targetTdInput.value);
+            savedUnits[quoteUnitNumber] = {
+                ...selectedUnit,
+                productLine: "DT",
+                price: selectedUnit.listPrice,
+                cellCount: 1,
+                roomLoad: Number(roomLoadInput.value),
+                numberOfEvaporators: Number(numberOfEvaporatorsInput.value),
+                roomTemperature,
+                targetTd,
+                targetCapacity: Number(roomLoadInput.value) * 12000 / targetTd / Number(numberOfEvaporatorsInput.value),
+                targetCoilTemperature: roomTemperature - targetTd,
+                capacityUnder: Number(dtCapacityUnderInput.value),
+                capacityOver: Number(dtCapacityOverInput.value),
+                fpiFilter: dtFpiFilterSelect.value,
+                rowsFilter: dtRowsFilterSelect.value,
+                seriesFilter: dtSeriesFilterSelect.value,
+                tubeFilter: dtTubeFilterSelect.value,
+                location: unitRow.location || "",
+                tag: unitRow.tag || ""
+            };
+            sessionStorage.setItem("selectsgs-quoted-units", JSON.stringify(savedUnits));
+            window.location.href = `index.html?unit=${quoteUnitNumber}&added=1`;
+        } catch (error) {
+            dtResultsStatus.textContent = "The selected DT/DTX unit could not be added to the quote. Check your browser storage settings and try again.";
+            console.error("Could not save selected DT/DTX unit to quote.", error);
         }
         return;
     }
@@ -2746,7 +3202,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
         const savedUnit = savedUnits[quoteUnitNumber];
         if (savedUnit) {
             setProductLine(savedUnit.productLine);
-            if (["BTR", "STC", "CF", "FL"].includes(savedUnit.productLine)) {
+            if (["BTR", "STC", "CF", "FL", "DT"].includes(savedUnit.productLine)) {
                 roomLoadInput.value = String(savedUnit.roomLoad ?? "");
                 numberOfEvaporatorsInput.value = String(savedUnit.numberOfEvaporators ?? 1);
                 roomTemperatureInput.value = String(savedUnit.roomTemperature ?? 0);
@@ -2786,6 +3242,24 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                     findCfUnits();
                     if (cfMatchingUnits.some(unit => unit.key === savedUnit.key)) {
                         selectCfUnit(savedUnit.key);
+                    }
+                } else if (savedUnit.productLine === "DT") {
+                    dtRefrigerantSelect.value = savedUnit.refrigerant ?? "R717";
+                    syncDtSelectionOptions();
+                    dtCoilMaterialSelect.value = savedUnit.coilMaterial ?? "SS";
+                    syncDtSelectionOptions();
+                    dtDefrostTypeSelect.value = savedUnit.defrostType ?? "A";
+                    dtRefrigerantFeedSelect.value = savedUnit.refrigerantFeed ?? "RB";
+                    dtCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
+                    dtCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
+                    dtFpiFilterSelect.value = savedUnit.fpiFilter ?? "";
+                    dtRowsFilterSelect.value = savedUnit.rowsFilter ?? "";
+                    dtSeriesFilterSelect.value = savedUnit.seriesFilter ?? "";
+                    dtTubeFilterSelect.value = savedUnit.tubeFilter ?? "";
+                    updateBtrSelectionVisibility();
+                    findDtUnits();
+                    if (dtMatchingUnits.some(unit => unit.key === savedUnit.key)) {
+                        selectDtUnit(savedUnit.key);
                     }
                 } else if (savedUnit.productLine === "FL") {
                     flCoilMaterialSelect.value = savedUnit.coilMaterial ?? "SS";
