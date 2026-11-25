@@ -1087,12 +1087,17 @@ function getEvaporatorModelNumber(unit) {
 function getBtrFanMotorHpValue(value) {
     if (Number.isFinite(value)) return value;
     if (typeof value !== "string") return null;
-    const fraction = value.trim().split("/").map(Number);
-    if (fraction.length === 1 && Number.isFinite(fraction[0])) return fraction[0];
-    if (fraction.length === 2 && fraction.every(Number.isFinite) && fraction[1] !== 0) {
-        return fraction[0] / fraction[1];
+    // Accepts "5", "1/3", and mixed numbers such as "1 1/2".
+    const parts = value.trim().split(/\s+/);
+    let total = 0;
+    for (const part of parts) {
+        const fraction = part.split("/").map(Number);
+        if (fraction.length === 1 && Number.isFinite(fraction[0])) total += fraction[0];
+        else if (fraction.length === 2 && fraction.every(Number.isFinite) && fraction[1] !== 0) {
+            total += fraction[0] / fraction[1];
+        } else return null;
     }
-    return null;
+    return parts[0] === "" ? null : total;
 }
 
 function renderUnitDetails(unitNumber) {
@@ -1932,6 +1937,150 @@ function updateQuotePrices() {
     }
 }
 
+const evaporatorMaterialDescriptions = {
+    "SS/AL": "Stainless Steel Tube/Aluminum Fin",
+    "AL/AL": "Aluminum Tube/Aluminum Fin",
+    "CU/AL": "Copper Tube/Aluminum Fin",
+    SS: "Stainless Steel Tube/Aluminum Fin",
+    AL: "Aluminum Tube/Aluminum Fin",
+    CU: "Copper Tube/Aluminum Fin",
+    HDG: "Steel HDG Tube/Aluminum Fin"
+};
+const evaporatorDefrostDescriptions = {
+    A: "A-Air Defrost",
+    HGC: "HGC-Hot Gas Coil Only",
+    HGS: "HGS-Hot Gas Unit (Series)",
+    HGP: "HGP-Hot Gas Unit (Parallel)",
+    HTS: "HTS-Hot Gas Unit (Series)",
+    HTP: "HTP-Hot Gas Unit, Tube Pan (Parallel)",
+    WD: "WD-Water Defrost",
+    ED: "ED-Electric Defrost Coil Only",
+    EDL: "EDL-Electric Defrost Coil and Drain Pan"
+};
+const evaporatorFeedDescriptions = {
+    RB: "Recirculating Bottom Refrigerant Feed",
+    RT: "Recirculating Top Refrigerant Feed",
+    FL: "Flooded Refrigerant Feed",
+    DX: "Direct Expansion Refrigerant Feed",
+    RECIRC: "Recirculated Refrigerant Feed",
+    FLOODED: "Flooded Refrigerant Feed"
+};
+
+function isEvaporatorUnit(unit) {
+    return ["BTR", "STC", "CF", "FL"].includes(unit.productLine) || isDtUnit(unit);
+}
+
+// Values for the Evaporator Specification Sheet. Anything the bundled data does not
+// provide is "N/A" rather than a guess.
+function buildEvaporatorSpec(unit) {
+    const NA = "N/A";
+    const orNA = value => value === undefined || value === null || value === "" ||
+        (typeof value === "number" && !Number.isFinite(value)) ? NA : value;
+    const round = (value, digits) => Number.isFinite(value) ? Number(value.toFixed(digits)) : NA;
+    const isBtr = unit.productLine === "BTR";
+    const isStc = unit.productLine === "STC";
+    const isDt = isDtUnit(unit);
+    const isCf = isCfFamily(unit);
+    const evaporators = Number(unit.numberOfEvaporators);
+    const tonsPerUnit = Number(unit.roomLoad) / evaporators;
+    const ratedCapacity = Number(unit.coilCapacity);
+    const targetTd = Number(unit.targetTd);
+
+    let rating = null;
+    let physical = null;
+    if (isBtr) {
+        const physicalModel = getBtrPhysicalModel(unit);
+        rating = window.selectSgsBtrRatings?.find(row => row.model === physicalModel);
+        physical = window.selectSgsBtrPhysicalSpecs?.[physicalModel];
+    }
+    const btrFan = isBtr ? getBtrFanSpecifications(unit) : null;
+    const fanText = String(isBtr ? rating?.fans : isStc ? unit.fanHp : "");
+    const fanCountFromText = /^\s*(\d+)\s*x/i.exec(fanText)?.[1];
+    const fanCount = isBtr || isStc ? (fanCountFromText ? Number(fanCountFromText) : NA) : unit.fans;
+    const perFanHp = isBtr ? getBtrFanMotorHpValue(unit.fanHp)
+        : isStc ? getBtrFanMotorHpValue(fanText.split("x").pop())
+        : Number(unit.fanHp);
+
+    const dimensions = isBtr ? (physical?.dimensionsIn
+            ? [physical.dimensionsIn.length, physical.dimensionsIn.width, physical.dimensionsIn.height] : null)
+        : isStc ? window.selectSgsStcDimensions?.[unit.model?.match(/^STC(\d)/)?.[1]]?.[unit.fanDiameterIn]?.[unit.rowsDeep]
+        : unit.dimensionsIn;
+    const airFlow = isBtr ? (unit.airFlowCfm ?? physical?.airFlowCfm) : unit.airFlowCfm;
+    const faceVelocity = isBtr ? unit.faceVelocity : unit.faceVelocityFpm ?? unit.faceVelocity;
+    const faceArea = isBtr ? rating?.coilFaceArea
+        : isStc ? unit.faceAreaSqFt
+        : isCf && Number.isFinite(airFlow) && Number.isFinite(faceVelocity) && faceVelocity > 0
+            ? airFlow / faceVelocity
+            : typeof unit.faceArea === "number" ? unit.faceArea : undefined;
+    const rows = isBtr ? Number(unit.model?.slice(-1)) : unit.rowsDeep;
+    const weight = isBtr ? physical?.shippingWeightsLb?.[unit.coilMaterial]
+        : isStc ? unit.shippingWeightLb
+        : isDt ? unit.coilWeightLb
+        : unit.coilMaterial === "HDG" ? unit.steelWeightLb : unit.aluminumWeightLb;
+    const fanDiameter = isBtr ? btrFan?.diameterIn : isStc ? unit.fanDiameterIn : isDt ? 22 : undefined;
+    const motorRpm = isBtr ? btrFan?.speedRpm : isStc ? unit.motorRpm : isDt ? 1140 : undefined;
+    const tube = isDt ? (unit.tube === "C" ? "5/8" : "3/4")
+        : isCf ? (unit.tube === "E" ? "1" : "3/4") : "3/4";
+    const unitType = isDt ? (unit.series === "DTX" ? "DTX" : "DT") : unit.productLine;
+    const roomTemperature = Number(unit.roomTemperature);
+    const ratedBtuhPerUnit = ratedCapacity * targetTd;
+
+    return {
+        designConditions: {
+            roomLoad: orNA(unit.roomLoad),
+            numberOfUnits: orNA(evaporators),
+            roomTemperature: orNA(roomTemperature),
+            targetTd: orNA(targetTd),
+            coilTemperature: orNA(unit.targetCoilTemperature ?? roomTemperature - targetTd),
+            refrigerant: unit.refrigerant ?? "R717",
+            tonsPerUnit: round(tonsPerUnit, 2),
+            btuhPerUnit: round(tonsPerUnit * 12000, 0),
+            targetCoilCapacity: round(Number(unit.targetCapacity), 0),
+            ratingCondition: String(unit.coilRatingCondition ?? NA).toUpperCase(),
+            maxFaceVelocity: roomTemperature > 34 ? 630 : "NONE"
+        },
+        actual: {
+            ratedCapacity: round(ratedCapacity, 0),
+            btuhPerUnit: round(ratedBtuhPerUnit, 0),
+            tonsTraditional: round(ratedBtuhPerUnit / 12000, 2),
+            tonsDtm: NA,
+            esp: unit.esp ?? 0,
+            airFlow: orNA(airFlow),
+            faceVelocity: round(Number(faceVelocity), 0)
+        },
+        coil: {
+            model: getEvaporatorModelNumber(unit),
+            unitType,
+            tubeDiameter: tube,
+            material: evaporatorMaterialDescriptions[unit.coilMaterial] ?? orNA(unit.coilMaterial),
+            rows: orNA(rows),
+            fpi: isBtr ? 4 : orNA(unit.finsPerInch),
+            variableFpi: "NONE",
+            faceArea: round(Number(faceArea), 1),
+            surfaceArea: orNA(isBtr ? physical?.totalSurfaceAreaSqFt : unit.surfaceAreaSqFt),
+            volume: orNA(unit.coilVolumeFt3),
+            charge: NA,
+            weight: orNA(weight),
+            fanDiameter: orNA(fanDiameter),
+            fanType: NA,
+            fans: orNA(fanCount),
+            fanHp: round(perFanHp, 3),
+            motorHp: round(perFanHp, 3),
+            motorRpm: orNA(motorRpm),
+            motorDescription: NA,
+            width: round(dimensions?.[1], 1),
+            length: round(dimensions?.[0], 1),
+            height: round(dimensions?.[2], 1)
+        },
+        defrost: {
+            defrostType: evaporatorDefrostDescriptions[unit.defrostType] ?? orNA(unit.defrostType),
+            feed: evaporatorFeedDescriptions[unit.refrigerantFeed] ?? orNA(unit.refrigerantFeed),
+            hand: NA
+        },
+        electrical: { voltage: NA, flaPerFan: NA, flaTotal: NA, wiring: NA }
+    };
+}
+
 exportQuoteButton.addEventListener("click", async () => {
     try {
         const units = unitRows.flatMap(row => {
@@ -1946,6 +2095,7 @@ exportQuoteButton.addEventListener("click", async () => {
                 unitNumber: Number(row.dataset.unitRow),
                 location: row.querySelector('[data-unit-field="location"]').value,
                 tag: row.querySelector('[data-unit-field="tag"]').value,
+                evaporatorSpec: isEvaporatorUnit(unit) ? buildEvaporatorSpec(unit) : undefined,
                 airUnitModelNumber: unit.productLine === "BTR"
                     ? getBtrAirUnitModelNumber(unit)
                     : unit.productLine === "STC"

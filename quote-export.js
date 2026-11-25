@@ -462,6 +462,126 @@
         return serializeXml(sheet);
     }
 
+    // Evaporator Specification Sheet: every evaporator line item uses this layout.
+    // Style ids are the Item EC styles plus those appended to quote-template.xlsx:
+    // 3 right-aligned, 38 left-aligned, 33 title with rule, 34 section header with rule,
+    // 35 rule filler.
+    function escapeXml(value) {
+        return String(value).replace(/[<>&"']/g, character => ({
+            "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;"
+        })[character]);
+    }
+
+    function makeEvaporatorSheet(templateXml, project, unit) {
+        const spec = unit.evaporatorSpec;
+        const rows = [];
+        const cell = (column, row, value, style) => {
+            if (value === undefined || value === null || value === "") {
+                return `<c r="${column}${row}" s="${style}"/>`;
+            }
+            if (typeof value === "number" && Number.isFinite(value)) {
+                return `<c r="${column}${row}" s="${style}"><v>${value}</v></c>`;
+            }
+            return `<c r="${column}${row}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
+        };
+        const addRow = (row, cells, height) => rows.push(
+            `<row r="${row}"${height ? ` ht="${height}" customHeight="1"` : ""}>${cells.join("")}</row>`
+        );
+        const columns = "ABCDEFGHIJ".split("");
+        const ruleRow = (row, text, style, height) => addRow(row, columns.map((column, index) =>
+            index === 0 ? cell(column, row, text, style) : cell(column, row, "", 35)
+        ), height);
+
+        ruleRow(6, "Evaporator Specification Sheet", 33, 18);
+        const header = [
+            ["Customer:", project.customer], ["Project Name:", project.projectName],
+            ["Quote #:", project.quoteNumber], ["Unit Location:", unit.location], ["Unit Tag:", unit.tag]
+        ];
+        header.forEach(([label, value], index) => addRow(8 + index, [
+            cell("A", 8 + index, label, 3), cell("B", 8 + index, value, 38)
+        ]));
+
+        let row = 14;
+        // Two-column section: [leftLabel, leftValue, leftUnit, rightLabel, rightValue, rightUnit]
+        const section = (title, lines, valueStyle) => {
+            ruleRow(row, title, 34, 15);
+            row += 2;
+            for (const [leftLabel, leftValue, leftUnit, rightLabel, rightValue, rightUnit] of lines) {
+                const cells = [];
+                if (leftLabel) {
+                    cells.push(cell("A", row, leftLabel, 25), cell("B", row, leftValue, valueStyle));
+                    if (leftUnit) cells.push(cell("C", row, leftUnit, 38));
+                }
+                if (rightLabel) {
+                    cells.push(cell("E", row, rightLabel, 25), cell("F", row, rightValue, valueStyle));
+                    if (rightUnit) cells.push(cell("G", row, rightUnit, 38));
+                }
+                addRow(row++, cells);
+            }
+            row += 1;
+        };
+
+        const design = spec.designConditions;
+        section("DESIGN CONDITIONS", [
+            ["Room Load", design.roomLoad, "Tons", "Tons per Air Unit", design.tonsPerUnit, "Tons"],
+            ["Number of Units", design.numberOfUnits, "", "BTUH per Air Unit", design.btuhPerUnit, "BTUH"],
+            ["Room Temperature", design.roomTemperature, "°F", "Target Coil Capacity", design.targetCoilCapacity, "BTUH/TD"],
+            ["Target Air to Coil DT", design.targetTd, "°F", "Coil Rating Condition", design.ratingCondition, ""],
+            ["Coil Temperature", design.coilTemperature, "°F", "Max Coil Face Velocity", design.maxFaceVelocity, "ft/min"],
+            ["Refrigerant", design.refrigerant]
+        ], 3);
+
+        const actual = spec.actual;
+        section("ACTUAL CAPACITY", [
+            ["Rated Coil Capacity", actual.ratedCapacity, "BTUH/TD", "External Static Pressure", actual.esp, '" W.C.'],
+            ["BTUH per Air Unit", actual.btuhPerUnit, "BTUH", "Air Flow Rate", actual.airFlow, "cfm"],
+            ["Tons / Air Unit (Traditional)", actual.tonsTraditional, "Tons", "Face Velocity", actual.faceVelocity, "fpm"],
+            ["Tons / Air Unit (DTM)", actual.tonsDtm, "Tons"]
+        ], 3);
+
+        const coil = spec.coil;
+        section("COIL DESCRIPTION", [
+            ["Model", coil.model, "", "Est. Shipping Weight Lbs", coil.weight],
+            ["Unit Type", coil.unitType, "", "Fan Diameter", coil.fanDiameter],
+            ["Tube Diameter", coil.tubeDiameter, "", "Fan Type", coil.fanType],
+            ["Cooling Material", coil.material, "", "Number of Fans", coil.fans],
+            ["Cooling Rows Deep", coil.rows, "", "Fan HP", coil.fanHp],
+            ["Fins Per Inch", coil.fpi, "", "Motor HP", coil.motorHp],
+            ["Variable FPI", coil.variableFpi, "", "Motor Speed rpm", coil.motorRpm],
+            ["Coil Face Area ft²", coil.faceArea, "", "Motor Description", coil.motorDescription],
+            ["Coil Surface Area ft²", coil.surfaceArea, "", "Unit Width (in)", coil.width],
+            ["Coil Volume ft³", coil.volume, "", "Unit Length (in)", coil.length],
+            ["R717 Refrigerant Wt (lb)", coil.charge, "", "Unit Height (in)", coil.height]
+        ], 38);
+
+        const defrost = spec.defrost;
+        section("COIL CIRCUITING AND DEFROST", [
+            ["Defrost Type", defrost.defrostType],
+            ["Refrigerant Feed", defrost.feed],
+            ["Coil Connection Hand", defrost.hand]
+        ], 38);
+
+        const electrical = spec.electrical;
+        section("ELECTRICAL DATA", [
+            ["Motor Voltage", electrical.voltage],
+            ["Motor(s) FLA per Fan", electrical.flaPerFan],
+            ["Motor(s) FLA Total", electrical.flaTotal],
+            ["Motor Wiring", electrical.wiring]
+        ], 38);
+
+        const headerRows = templateXml.match(/<row r="1"[\s\S]*?(?=<row r="6")/)?.[0];
+        if (!headerRows) throw new Error("The quote template header rows could not be found.");
+        const widths = [27, 17, 11, 3.3, 27, 16, 11, 12, 12, 12];
+        const cols = widths.map((width, index) =>
+            `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`
+        ).join("");
+        return templateXml
+            .replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:J${row}"/>`)
+            .replace(/<cols>[\s\S]*?<\/cols>/, `<cols>${cols}</cols>`)
+            .replace(/<sheetData>[\s\S]*<\/sheetData>/, () => `<sheetData>${headerRows}${rows.join("")}</sheetData>`)
+            .replace(/<mergeCells[\s\S]*?<\/mergeCells>/, "");
+    }
+
     async function makeItemSheets(files, project, units, itemSheet) {
         const workbook = files.find(file => file.name === "xl/workbook.xml");
         const workbookRelationships = files.find(file => file.name === "xl/_rels/workbook.xml.rels");
@@ -555,7 +675,9 @@
                 );
             }
             sheetNode.setAttribute("name", sheetName);
-            replaceZipEntryText(sheetEntry, makeItemEcSheet(templateXml, project, unit));
+            replaceZipEntryText(sheetEntry, unit.evaporatorSpec
+                ? makeEvaporatorSheet(templateXml, project, unit)
+                : makeItemEcSheet(templateXml, project, unit));
         }
 
         await updateWorkbookProperties(
@@ -774,7 +896,7 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261111-1507");
+        templateUrl.searchParams.set("v", "20261125-1200");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
