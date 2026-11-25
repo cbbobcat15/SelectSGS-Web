@@ -319,6 +319,15 @@
 
         .unit-table-wrapper {
             overflow-x: auto;
+            overflow-y: auto;
+            /* Ten line items show at once; more rows scroll. */
+            max-height: calc(var(--unit-header-height, 25px) + 10 * var(--unit-row-height, 34px) + 2px);
+        }
+
+        .unit-list thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
 
         .unit-list tbody tr[aria-selected="true"] {
@@ -827,15 +836,7 @@
                     <thead>
                         <tr><th scope="col">#</th><th scope="col">Location</th><th scope="col">Unit Tag</th><th scope="col">Unit Type</th><th scope="col">Net Price</th></tr>
                     </thead>
-                    <tbody>
-                        <tr data-unit-row="1"><th scope="row">1</th><td><input data-unit-field="location" aria-label="Location for unit 1"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 1"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="2"><th scope="row">2</th><td><input data-unit-field="location" aria-label="Location for unit 2"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 2"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="3"><th scope="row">3</th><td><input data-unit-field="location" aria-label="Location for unit 3"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 3"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="4"><th scope="row">4</th><td><input data-unit-field="location" aria-label="Location for unit 4"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 4"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="5"><th scope="row">5</th><td><input data-unit-field="location" aria-label="Location for unit 5"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 5"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="6"><th scope="row">6</th><td><input data-unit-field="location" aria-label="Location for unit 6"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 6"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="7"><th scope="row">7</th><td><input data-unit-field="location" aria-label="Location for unit 7"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 7"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
-                        <tr data-unit-row="8"><th scope="row">8</th><td><input data-unit-field="location" aria-label="Location for unit 8"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit 8"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td></tr>
+                    <tbody id="unit-rows-body">
                     </tbody>
                 </table>
             </div>
@@ -913,7 +914,10 @@ const moveProjectDownButton = document.getElementById("move-project-down");
 const archiveProjectButton = document.getElementById("archive-project");
 const deleteProjectButton = document.getElementById("delete-project");
 const unitList = document.getElementById("unit-list");
-const unitRows = [...document.querySelectorAll("[data-unit-row]")];
+const unitRowsBody = document.getElementById("unit-rows-body");
+const defaultUnitRowCount = 10;
+const maxUnitRowCount = 100;
+const unitRows = [];
 const exportQuoteButton = document.getElementById("export-quote");
 const lineItemActions = document.getElementById("line-item-actions");
 const copyLineItemButton = document.getElementById("copy-line-item");
@@ -948,7 +952,7 @@ const productPrices = window.selectSgsProductPricing?.models ?? {};
 const deselectOptionValue = "__deselect__";
 let quotedUnits = {};
 const requestedUnitNumber = Number(new URLSearchParams(window.location.search).get("unit"));
-let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= 8
+let activeUnitNumber = Number.isInteger(requestedUnitNumber) && requestedUnitNumber >= 1 && requestedUnitNumber <= maxUnitRowCount
     ? requestedUnitNumber
     : null;
 let costMultiplier = 0.35;
@@ -1878,6 +1882,7 @@ function saveQuotedUnits() {
 }
 
 function updateQuotePrices() {
+    syncUnitRows();
     let total = 0;
     const unavailableModels = [];
     for (const row of unitRows) {
@@ -2448,6 +2453,8 @@ function updateUnitList() {
         !quotedUnits[activeUnitNumber];
 }
 
+syncUnitRows();
+
 try {
     activeProjectId = sessionStorage.getItem("selectsgs-active-project-id");
     const savedProject = sessionStorage.getItem("selectsgs-project");
@@ -2464,6 +2471,15 @@ try {
     if (savedUnitRows) {
         const unitData = JSON.parse(savedUnitRows);
         if (Array.isArray(unitData)) {
+            // Create enough rows for every saved line item plus one empty row.
+            const savedExtent = Math.max(
+                0,
+                ...unitData.flatMap((savedRow, index) =>
+                    savedRow && (savedRow.location || savedRow.tag) ? [index + 1] : []),
+                ...Object.keys(JSON.parse(sessionStorage.getItem("selectsgs-quoted-units") || "{}")).map(Number)
+                    .filter(Number.isInteger)
+            );
+            syncUnitRows(savedExtent + 1);
             unitRows.forEach((row, index) => {
                 const savedRow = unitData[index];
                 if (!savedRow || typeof savedRow !== "object") return;
@@ -2563,14 +2579,41 @@ for (const field of projectFields) {
     });
 }
 
-for (const row of unitRows) {
-    const unitNumber = row.dataset.unitRow;
+function createUnitRow(unitNumber) {
+    const row = document.createElement("tr");
+    row.dataset.unitRow = String(unitNumber);
+    row.innerHTML = `<th scope="row">${unitNumber}</th><td><input data-unit-field="location" aria-label="Location for unit ${unitNumber}"></td><td><input data-unit-field="tag" aria-label="Unit tag for unit ${unitNumber}"></td><td><button class="select-unit" type="button">Click to Select</button></td><td data-unit-price>—</td>`;
+    unitRowsBody.append(row);
+    unitRows.push(row);
+    row.setAttribute("aria-selected", String(Number(activeUnitNumber) === unitNumber));
     const quotedUnit = quotedUnits[unitNumber];
-    row.setAttribute("aria-selected", "false");
     if (quotedUnit) {
         row.querySelector(".select-unit").textContent = getUnitProductFamily(quotedUnit);
     }
+    wireUnitRow(row);
+    return row;
+}
 
+function unitRowIsFilled(row) {
+    return Boolean(quotedUnits[row.dataset.unitRow]) ||
+        row.querySelector('[data-unit-field="location"]').value.trim() !== "" ||
+        row.querySelector('[data-unit-field="tag"]').value.trim() !== "";
+}
+
+// Shows ten line items by default. Another row is added only once every shown row is filled,
+// and unused trailing rows beyond the default ten are removed again.
+function syncUnitRows(minimumCount = 0) {
+    let lastFilled = 0;
+    unitRows.forEach((row, index) => {
+        if (unitRowIsFilled(row)) lastFilled = index + 1;
+    });
+    const target = Math.min(maxUnitRowCount, Math.max(defaultUnitRowCount, lastFilled + 1, minimumCount));
+    while (unitRows.length < target) createUnitRow(unitRows.length + 1);
+    while (unitRows.length > target) unitRows.pop().remove();
+}
+
+function wireUnitRow(row) {
+    const unitNumber = row.dataset.unitRow;
     row.addEventListener("click", event => {
         if (event.target.closest("button")) return;
         selectLineItem(unitNumber);
@@ -2582,6 +2625,7 @@ for (const row of unitRows) {
         });
         field.addEventListener("input", () => {
             saveProjectData();
+            syncUnitRows();
             if (Number(activeUnitNumber) === Number(unitNumber)) renderUnitDetails(unitNumber);
         });
         field.addEventListener("change", () => {
@@ -2601,6 +2645,12 @@ for (const row of unitRows) {
         window.location.href = `unit-selection.html?unit=${unitNumber}`;
     });
 }
+
+unitRows.forEach(row => {
+    row.setAttribute("aria-selected", "false");
+    const quotedUnit = quotedUnits[row.dataset.unitRow];
+    if (quotedUnit) row.querySelector(".select-unit").textContent = getUnitProductFamily(quotedUnit);
+});
 
 copyLineItemButton.addEventListener("click", copySelectedLineItem);
 editLineItemButton.addEventListener("click", editSelectedLineItem);
