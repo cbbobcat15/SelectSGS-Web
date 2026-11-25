@@ -894,6 +894,7 @@
 <script src="stc-product-pricing.js?v=20261124-1850"></script>
 <script src="stc-dimensions.js?v=20261124-1850"></script>
 <script src="cf-product-pricing.js?v=20261124-1900"></script>
+<script src="fl-product-pricing.js?v=20261124-1910"></script>
 <script src="quote-export.js?v=20261111-1540"></script>
 <script>
 const projectForm = document.getElementById("project-form");
@@ -1015,9 +1016,14 @@ function getStcModelNumber(unit) {
     return `STC${modelMatch[1]}${materialCode}-${modelMatch[2]}-${feedCode}${refrigerantCode}-${defrostCode}`;
 }
 
-// CF model number: CF<tube><material><fans><fan size>-<face area><rows><FPI><motor HP>-<feed><refrigerant>-<defrost>-<hand><discharge>,
-// e.g. CFDA2A-641035-RBA-HGS-RHTH. A, HGC and ED become IA, IHGC and IED when an insulated pan cover
+// CF and FL model number (FL uses the same pattern with an FL prefix): CF<tube><material><fans><fan size>-<face area><rows>-<FPI>-<motor HP>-<feed><refrigerant>-<defrost>,
+// e.g. CFDA2A-6410-3-5-RBA-HGS. A, HGC and ED become IA, IHGC and IED when an insulated pan cover
 // is selected; an Electrofin or Heresite coating adds -EF or -HC.
+// CF and FL evaporators share the same quote handling (ratings differ, pricing sheets have the same layout).
+function isCfFamily(unit) {
+    return unit?.productLine === "CF" || unit?.productLine === "FL";
+}
+
 function getCfModelNumber(unit) {
     const materialCode = { AL: "A", SS: "B", CU: "C", HDG: "S" }[unit.coilMaterial];
     const refrigerantCode = { R717: "A" }[unit.refrigerant ?? "R717"];
@@ -1031,12 +1037,12 @@ function getCfModelNumber(unit) {
         ED: insulatedPanSelected ? "IED" : "ED"
     }[unit.defrostType] ?? unit.defrostType;
     const coating = selectedIds.includes("CF_Electrofin") ? "-EF" : selectedIds.includes("CF_Heresite") ? "-HC" : "";
-    const rowsAndFpi = `${unit.faceArea}${unit.rowsDeep}${unit.finsPerInch}${unit.fanHp}`;
-    return `CF${unit.tube}${materialCode}${unit.fans}${unit.fanSize}-${rowsAndFpi}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}-${unit.hand ?? "RH"}${unit.fanDischarge ?? "TH"}${coating}`;
+    const rowsAndFpi = `${unit.faceArea}${unit.rowsDeep}-${unit.finsPerInch}-${unit.fanHp}`;
+    return `${unit.productLine}${unit.tube}${materialCode}${unit.fans}${unit.fanSize}-${rowsAndFpi}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${coating}`;
 }
 
 function getEvaporatorModelNumber(unit) {
-    return unit.productLine === "CF"
+    return isCfFamily(unit)
         ? getCfModelNumber(unit)
         : unit.productLine === "STC"
             ? getStcModelNumber(unit)
@@ -1072,7 +1078,7 @@ function renderUnitDetails(unitNumber) {
 
     const isBtr = unit.productLine === "BTR";
     const isStc = unit.productLine === "STC";
-    const isCf = unit.productLine === "CF";
+    const isCf = isCfFamily(unit);
     details.classList.toggle("unit-specifications--btr", isBtr || isStc || isCf);
     const options = getUnitOptions(unit);
     renderOptionRows(options, unit);
@@ -1121,7 +1127,7 @@ function renderUnitDetails(unitNumber) {
         ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
         ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
         ["ESP", unit.esp == null ? undefined : `${unit.esp}"`],
-        ["Fan size", unit.fanSize],
+        ["Fan quantity", unit.fans],
         ["Fan motor(s)", unit.fanHp == null ? undefined : `${unit.fanHp.toLocaleString(undefined, { maximumFractionDigits: 2 })} HP`],
         ["Coil tube diameter", unit.tube === "E" ? `1"` : `3/4"`]
     ] : isStc ? [
@@ -1163,7 +1169,7 @@ function renderUnitDetails(unitNumber) {
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
     ] : isCf ? [
-        ["Hand / discharge", unit.hand ? `${unit.hand} / ${unit.fanDischarge}` : undefined],
+        ["Fan size", unit.fanSize],
         ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
         ["Cooling rows deep", unit.rowsDeep == null ? undefined : `${unit.rowsDeep} RD`],
         ["Fins per inch", unit.finsPerInch == null ? undefined : `${unit.finsPerInch} FPI`],
@@ -1382,7 +1388,7 @@ function getUnitProductFamily(unit) {
 
 function isPricedProductLine(unit) {
     return unit.productLine === "IEC" || unit.productLine === "DTC" ||
-        unit.productLine === "BTR" || unit.productLine === "STC" || unit.productLine === "CF" ||
+        unit.productLine === "BTR" || unit.productLine === "STC" || isCfFamily(unit) ||
         typeof unit.model === "string" && /^(IEC|DTC)-/.test(unit.model);
 }
 
@@ -1453,19 +1459,22 @@ function getProductPricing(unit) {
         };
     }
 
-    if (unit.productLine === "CF") {
-        const pricingData = window.selectSgsCfProductPricing;
+    if (isCfFamily(unit)) {
+        const pricingData = unit.productLine === "FL" ? window.selectSgsFlProductPricing : window.selectSgsCfProductPricing;
         const pricing = pricingData?.models?.[unit.pricingModel];
-        const defrostKey = { A: "A_HGC", HGC: "A_HGC", HGS: "HGS_HGP", HGP: "HGS_HGP", ED: "ED", EDL: "EDL" }[unit.defrostType];
+        const defrostKey = { WD: "WD", A: "A_HGC", HGC: "A_HGC", HGS: "HGS_HGP", HGP: "HGS_HGP", ED: "ED", EDL: "EDL" }[unit.defrostType];
         const basePrice = pricing?.basePrices?.[defrostKey];
         const motorAdder = pricingData?.motorAdders?.[String(pricing?.standardHp)]?.[String(unit.fanHp)];
         if (!pricing || !Number.isFinite(basePrice) || !Number.isFinite(motorAdder)) return null;
         // Insulated covers upgrade A, HGC and ED units; hot gas pan and EDL units already include a mill galvanized cover.
         const insulatedCoverDefrost = ["A", "HGC", "ED"].includes(unit.defrostType);
         const includedCover = ["HGS", "HGP", "EDL"].includes(unit.defrostType);
-        const panCoverOptions = insulatedCoverDefrost
-            ? ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS"]
-            : ["CF_SS_Pan_Cover"];
+        // Water defrost has no pan cover prices in the price list.
+        const panCoverOptions = unit.defrostType === "WD"
+            ? []
+            : insulatedCoverDefrost
+                ? ["CF_Ins_Pan_Cover_MG", "CF_Ins_Pan_Cover_SS"]
+                : ["CF_SS_Pan_Cover"];
         const definitions = pricingData.optionDefinitions;
         return {
             basePrice: basePrice + motorAdder * unit.fans,
@@ -1504,7 +1513,7 @@ function getOptionUom(unit, pricing) {
 }
 
 function getUnitOptionLineCount(unit) {
-    if (unit.productLine === "CF") return cfSelectableOptionLineCount + 1;
+    if (isCfFamily(unit)) return cfSelectableOptionLineCount + 1;
     return usesEvaporatorOptionLayout(unit) ? btrSelectableOptionLineCount + 1 : optionLineCount;
 }
 
@@ -1589,7 +1598,7 @@ function getUnitOptions(unit) {
         if (drainPanIndex === -1) unit.options[0].optionId = stcStandardPanOptionId;
     }
 
-    if (unit.productLine === "CF") {
+    if (isCfFamily(unit)) {
         let hasDrainPanOption = false;
         for (const option of unit.options) {
             if (!isCfDrainPanOptionId(option.optionId)) continue;
@@ -1609,7 +1618,7 @@ function getUnitOptions(unit) {
 // BTR and STC evaporators share one option layout: a single drain pan selector,
 // six selectable option rows, and three write-in rows.
 function usesEvaporatorOptionLayout(unit) {
-    return unit.productLine === "BTR" || unit.productLine === "STC" || unit.productLine === "CF";
+    return unit.productLine === "BTR" || unit.productLine === "STC" || isCfFamily(unit);
 }
 
 function isCfDrainPanOptionId(optionId) {
@@ -1621,7 +1630,7 @@ function isStcDrainPanOptionId(optionId) {
 }
 
 function isDrainPanOptionId(unit, optionId) {
-    return unit.productLine === "CF"
+    return isCfFamily(unit)
         ? isCfDrainPanOptionId(optionId)
         : unit.productLine === "STC"
             ? isStcDrainPanOptionId(optionId)
@@ -1834,7 +1843,7 @@ exportQuoteButton.addEventListener("click", async () => {
                     ? getBtrAirUnitModelNumber(unit)
                     : unit.productLine === "STC"
                         ? getStcModelNumber(unit)
-                        : unit.productLine === "CF"
+                        : isCfFamily(unit)
                             ? getCfModelNumber(unit)
                             : unit.model,
                 baseNetPrice: (productPricing?.basePrice ?? (Number(unit.price) || 0)) * costMultiplier,
@@ -2440,7 +2449,7 @@ optionsPanel.addEventListener("change", event => {
         } else {
             options[index].optionId = select.value;
         }
-        if (usesEvaporatorOptionLayout(activeUnit) && (index === 0 || activeUnit.productLine === "CF")) {
+        if (usesEvaporatorOptionLayout(activeUnit) && (index === 0 || isCfFamily(activeUnit))) {
             const modelValue = document.querySelector("#unit-details-list .unit-detail-model strong");
             if (modelValue) {
                 modelValue.textContent = getEvaporatorModelNumber(activeUnit);
