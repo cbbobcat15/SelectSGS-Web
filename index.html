@@ -1561,7 +1561,10 @@ function getProductPricing(unit) {
                     uom: "per Unit"
                 },
                 ...pricingData.optionDefinitions.flatMap((definition, index) => {
-                    const price = pricing.options?.[index];
+                    // Blow thru is the BT model price less the DT model price for the selected defrost type.
+                    const price = definition.id === "DT_Blow_Thru"
+                        ? pricing.blowThru?.[defrostKey]
+                        : pricing.options?.[index];
                     if (!price || !isOptionApplicable(definition.id)) return [];
                     return [{ ...definition, price, uom: "per Unit" }];
                 })
