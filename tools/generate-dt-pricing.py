@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Rebuild dt-product-pricing.js from the SGS price list workbook (sheets DTDS DTXDS, DTDC DTXDC, DTDA DTXDA, DTDB DTXDB).
 
-Usage: python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx [dt-product-pricing.js]
+Usage: python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx [dt-product-pricing.js] [SELECTSGS_DATABASE.xlsx]
+
+The 5/8" stainless tube units (DTCB / DTXCB, key prefix DT5B / DTX5B) are not on the price list sheets. Their base
+prices and per-model options come from sheet tbl_PRICE_TABLE_NEW of the SelectSGS database workbook; that sheet's
+3/4" values match the price list sheets exactly, but its list price additions (heat tape, long throw adapter,
+reheat) are older, so the 5/8" units use the stainless sheet's current list price additions.
 
 Each sheet lists the DT models (rows 6-59) followed by the DTX models (rows 60-101). Model names differ by sheet
 (DTDS1-185, DTDC1-185, DT1A-209, DTDB1-209 and the DTX equivalents); they are normalized to
@@ -36,6 +41,10 @@ OPTIONS = [("DT_Pan_SS_Ins_Cover", "Full Coverage Drain Pan w/ SS Insulated Cove
            ("DT_Electric_Reheat", "4.65 KW Electric Reheat Per Fan Section (6 Rows Only)", ("perfan", "H118")),
            ("DT_Add_Hdrs_HGR", "Add'l Set of Hdrs for Hot Gas Reheat, or Distributor & Hdr", ("flat", "H119"))]
 
+DB_OPTION_CODES = ["FCPan_SS_IA_IHGC_IED", "FCPan_SS_Welded_IA_IHGC_IED", "FCPan_SS_Welded_HGP_HGS_HTP_HTS", "SS_Casing",
+                   "Gold_Epx_Pre", "Elec_Fin_Coat", "Heresite_C", "Motor_Eff_0.5_2S", "inv_ready_mtr"]
+DB_BASE = {"A": "A_HGC", "HGS": "HGS_HGP", "HTS": "HTS_HTP", "WD": "WD", "ED": "ED", "EDL": "EDL"}
+
 def num(v):
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
@@ -50,8 +59,50 @@ def normalize(code):
         series, material, fans, digits = m.group(1), m.group(2), m.group(3), m.group(4)
     return f"{series}{material}{fans}-{digits}"
 
-def main(xlsx, out):
+def add_five_eighths(models, database, additions):
+    by_fans, flat = additions
+    wb = openpyxl.load_workbook(database, read_only=True, data_only=True)
+    db = {}
+    for row in wb["tbl_PRICE_TABLE_NEW"].iter_rows(min_row=2, values_only=True):
+        if row[0] and re.match(r"^DTX?[CD]B\d-\d+$", str(row[0])):
+            db.setdefault(row[0], {})[row[7]] = num(row[9])
+    # The database's 3/4" stainless model prices must equal the price list sheets before its 5/8" prices are trusted.
+    checked = mismatches = 0
+    for code, values in db.items():
+        m = re.match(r"^(DTX?)DB(\d)-(\d+)$", code)
+        if not m:
+            continue
+        sheet = models.get(f"{m.group(1)}B{m.group(2)}-{m.group(3)}")
+        for base_code, key in (("Base_A", "A_HGC"), ("Base_HGS", "HGS_HGP"), ("Base_HTS", "HTS_HTP"), ("Base_ED", "ED"), ("Base_EDL", "EDL")):
+            if sheet and key in sheet["basePrices"]:
+                checked += 1
+                mismatches += abs(values.get(base_code, 0) - sheet["basePrices"][key]) > 0.5
+    assert checked > 300 and mismatches == 0, (checked, mismatches)
+    count = 0
+    for code, values in sorted(db.items()):
+        m = re.match(r"^(DTX?)CB(\d)-(\d+)$", code)
+        if not m:
+            continue
+        series, fans, digits = m.group(1), int(m.group(2)), m.group(3)
+        base = {key: round(values[f"Base_{name}"], 2) for name, key in DB_BASE.items() if values.get(f"Base_{name}")}
+        if "A_HGC" not in base:
+            continue
+        options = [round(values.get(c) or 0, 2) for c in DB_OPTION_CODES]
+        for oid, label, source in OPTIONS[len(DB_OPTION_CODES):]:
+            if source[0] == "fans":
+                price = by_fans[fans][source[1] - 2]
+            elif source[0] == "flat":
+                price = flat[source[1]]
+            else:
+                price = flat[source[1]] * fans
+            options.append(round(price, 2) if price else 0)
+        models[f"{series}5B{fans}-{digits}"] = {"basePrices": base, "options": options}
+        count += 1
+    print(count, "5/8 inch stainless models added from the database;", checked, "3/4 inch base prices matched the sheets")
+
+def main(xlsx, out, database=None):
     wb = openpyxl.load_workbook(xlsx, data_only=True)
+    sheet_additions = {}
     models = {}
     for sheet, material in SHEETS.items():
         ws = wb[sheet]
@@ -59,6 +110,7 @@ def main(xlsx, out):
         for r in range(109, 115):
             fans = ws.cell(r, 2).value
             by_fans[int(fans)] = [num(ws.cell(r, c).value) for c in (3, 4, 5)]
+        sheet_additions[material] = (by_fans, {"H116": num(ws["H116"].value), "H118": num(ws["H118"].value), "H119": num(ws["H119"].value)})
         flat = {"H116": num(ws["H116"].value), "H118": num(ws["H118"].value), "H119": num(ws["H119"].value)}
         for row in ws.iter_rows(min_row=6, max_row=101, values_only=True):
             key = normalize(row[1])
@@ -83,6 +135,8 @@ def main(xlsx, out):
             assert key not in models, key
             models[key] = {"basePrices": base, "options": options}
     assert len(models) == 4 * 96, len(models)
+    if database:
+        add_five_eighths(models, database, sheet_additions["B"])
     with open(out, "w", encoding="utf-8") as f:
         f.write("window.selectSgsDtProductPricing = " +
                 json.dumps({"optionDefinitions": [{"id": o[0], "label": o[1], "uom": "per Unit"} for o in OPTIONS],
@@ -90,4 +144,5 @@ def main(xlsx, out):
     print(len(models), "models written to", out)
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "dt-product-pricing.js")
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "dt-product-pricing.js",
+         sys.argv[3] if len(sys.argv) > 3 else None)

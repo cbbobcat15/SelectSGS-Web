@@ -7,8 +7,8 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 - Refrigerant: R717, R22, R404A or R507. Copper tube coils cannot be used with ammonia (PDF 4.2), so R717 offers SS, AL and Steel HDG, and the halocarbons offer CU only. Capacities are the same steel/copper table values (PDF note: use the copper tube capacities for R-22/404A/507A).
 - Defrost type: A, HGC, HGS/HGP (waffle pan, series/parallel), HTS/HTP (tube pan, series/parallel), WD (6 row units only) and ED/EDL (not offered on steel coils). Units without a price for the chosen material and defrost type are not offered.
 - Refrigerant feed: RB, RT, FL, or DX. DX uses the DX rating columns; RB, RT and FL use the REC (recirculated/flooded) columns.
-- ESP is 0" only (ratings are for 0" ESP) and there is no ESP selection. Tube is 3/4" only.
-- Results filters: FPI (3, 4, 6), Rows Deep (6, 8) and Series (DT, DTX), plus the capacity tolerances. Default sort is List Price ascending; every column sorts.
+- ESP is 0" only (ratings are for 0" ESP) and there is no ESP selection. Tube is 3/4" for every material except stainless, which is also offered with 5/8" tube (Tube Diameter results filter).
+- Results filters: FPI (3, 4, 6), Rows Deep (6, 8) and Series (DT, DTX), Tube Diameter (3/4", 5/8") and the capacity tolerances. Default sort is List Price ascending; every column sorts.
 
 ## Capacity
 
@@ -16,7 +16,7 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 - Capacity per 1°F TD is compared with `Room Load × 12,000 ÷ Target TD ÷ # of Evaps`.
 - Section 1.6 low suction temperature factor applies to DX-frosted ratings only: 1.0 down to −20°F, then linear through 0.9 at −30°F, 0.8 at −40°F and 0.7 at −50°F (for example 0.85 at −35°F). REC frosted ratings are rated to −50°F and are not corrected. The factor is interpolated linearly from −20°F rather than stepped by range, based on the PDF note that gives 0.85 at −35°F.
 - When room temperature is above 34°F, units over 630 FPM face velocity are excluded (same rule as the other evaporators). A note appears when Target TD is above 20°F because the ratings are valid for TDs of 20°F or less.
-- The 5/8" stainless tube tables (PDF pp. 13–14) are bundled but not offered: the price list has no 5/8" prices, and the PDF says those tables are partly copied from the 3/4" coil data and need review.
+- 5/8" stainless tube units (PDF pp. 13–14, model key tube letter C, for example `DTXCB2-621-RBA-A`) are offered. The PDF says their air flow, face velocity and surface area are copied from the 3/4" coil and need factory review, so the results panel shows a note whenever 5/8" units are listed.
 
 ## Pricing and options
 
@@ -27,7 +27,7 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 
 ## Model number
 
-`<DT|DTX|BT|BTX>D<material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR; coating is -EF, -HC or -GF; selecting Blow Thru changes DT/DTX to BT/BTX. Coil connection hand is not a selection input and is omitted.
+`<DT|DTX|BT|BTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR; coating is -EF, -HC or -GF; selecting Blow Thru changes DT/DTX to BT/BTX. Coil connection hand is not a selection input and is omitted.
 
 ## Dimensions
 
@@ -36,6 +36,6 @@ Length by fan count (52.375, 80.38, 108.5, 136.25, 164.25, 192.25 in), depth 41.
 ## Data files
 
 - `dt-ratings.js`: `python3 -I tools/generate-dt-ratings.py DT_DTX_Unit_Data_Tables.xlsx dt-ratings.js` (the workbook transcribed from PDF pages 9–14).
-- `dt-product-pricing.js`: `python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx dt-product-pricing.js`.
+- `dt-product-pricing.js`: `python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx dt-product-pricing.js SELECTSGS_DATABASE.xlsx`. The 5/8" units are not on the price list sheets; their base and per-model option prices come from the database workbook (`tbl_PRICE_TABLE_NEW`, models DTCB/DTXCB). The generator first checks that the database's 3/4" stainless base prices match the price list sheets (420 prices, all equal), and uses the price list's current list price additions (heat tape, long throw adapter, reheat) because the database's are older.
 
 Known PDF issues carried as printed: model 3-720 (DTX) lists "2 x 1/3" fans (the fan count is taken from the model number, 3); face area and coil volume for 5-1270 and 6-1530 look rounded; 6-1441 face velocity does not match CFM ÷ face area.

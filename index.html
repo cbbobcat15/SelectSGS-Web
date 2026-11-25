@@ -1071,7 +1071,7 @@ function getDtModelNumber(unit) {
         : selectedIds.includes("DT_Gold_Epoxy_Fins") ? "-GF" : "";
     const series = unit.series === "DTX" ? "DTX" : "DT";
     const prefix = selectedIds.includes("DT_Blow_Thru") ? series.replace("DT", "BT") : series;
-    return `${prefix}D${materialCode}${unit.fans}-${digits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
+    return `${prefix}${unit.tube === "C" ? "C" : "D"}${materialCode}${unit.fans}-${digits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
 }
 
 function getEvaporatorModelNumber(unit) {
@@ -1165,7 +1165,7 @@ function renderUnitDetails(unitNumber) {
         ["ESP", `0"`],
         ["Fan quantity", unit.fans],
         ["Fan motor(s)", unit.fanHpText == null ? undefined : `${unit.fanHpText} HP`],
-        ["Coil tube diameter", `3/4"`]
+        ["Coil tube diameter", unit.tube === "C" ? `5/8"` : `3/4"`]
     ] : isCf ? [
         ["Number of AHU", unit.numberOfEvaporators],
         ["Actual capacity", unit.coilCapacity == null ? undefined : `${unit.coilCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })} BTUH/TD`],
