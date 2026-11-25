@@ -1015,8 +1015,8 @@ function getStcModelNumber(unit) {
     return `STC${modelMatch[1]}${materialCode}-${modelMatch[2]}-${feedCode}${refrigerantCode}-${defrostCode}`;
 }
 
-// CF model number: CF<tube><material><fans><fan size>-<face area><rows><FPI><motor HP>-<feed><refrigerant>-<defrost>-<hand><discharge>,
-// e.g. CFDA2A-641035-RBA-HGS-RHTH. A, HGC and ED become IA, IHGC and IED when an insulated pan cover
+// CF model number: CF<tube><material><fans><fan size>-<face area><rows>-<FPI>-<motor HP>-<feed><refrigerant>-<defrost>,
+// e.g. CFDA2A-6410-3-5-RBA-HGS. A, HGC and ED become IA, IHGC and IED when an insulated pan cover
 // is selected; an Electrofin or Heresite coating adds -EF or -HC.
 function getCfModelNumber(unit) {
     const materialCode = { AL: "A", SS: "B", CU: "C", HDG: "S" }[unit.coilMaterial];
@@ -1031,8 +1031,8 @@ function getCfModelNumber(unit) {
         ED: insulatedPanSelected ? "IED" : "ED"
     }[unit.defrostType] ?? unit.defrostType;
     const coating = selectedIds.includes("CF_Electrofin") ? "-EF" : selectedIds.includes("CF_Heresite") ? "-HC" : "";
-    const rowsAndFpi = `${unit.faceArea}${unit.rowsDeep}${unit.finsPerInch}${unit.fanHp}`;
-    return `CF${unit.tube}${materialCode}${unit.fans}${unit.fanSize}-${rowsAndFpi}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}-${unit.hand ?? "RH"}${unit.fanDischarge ?? "TH"}${coating}`;
+    const rowsAndFpi = `${unit.faceArea}${unit.rowsDeep}-${unit.finsPerInch}-${unit.fanHp}`;
+    return `CF${unit.tube}${materialCode}${unit.fans}${unit.fanSize}-${rowsAndFpi}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${coating}`;
 }
 
 function getEvaporatorModelNumber(unit) {
@@ -1121,7 +1121,7 @@ function renderUnitDetails(unitNumber) {
         ["Room temp", unit.roomTemperature == null ? undefined : `${unit.roomTemperature} °F`],
         ["Delta T", unit.targetTd == null ? undefined : `${unit.targetTd} °F`],
         ["ESP", unit.esp == null ? undefined : `${unit.esp}"`],
-        ["Fan size", unit.fanSize],
+        ["Fan quantity", unit.fans],
         ["Fan motor(s)", unit.fanHp == null ? undefined : `${unit.fanHp.toLocaleString(undefined, { maximumFractionDigits: 2 })} HP`],
         ["Coil tube diameter", unit.tube === "E" ? `1"` : `3/4"`]
     ] : isStc ? [
@@ -1163,7 +1163,7 @@ function renderUnitDetails(unitNumber) {
         ["Width", dimensions ? formatDimension(dimensions.width) : undefined],
         ["Height", dimensions ? formatDimension(dimensions.height) : undefined]
     ] : isCf ? [
-        ["Hand / discharge", unit.hand ? `${unit.hand} / ${unit.fanDischarge}` : undefined],
+        ["Fan size", unit.fanSize],
         ["Face velocity", unit.faceVelocityFpm == null ? undefined : `${unit.faceVelocityFpm.toLocaleString(undefined, { maximumFractionDigits: 0 })} FPM`],
         ["Cooling rows deep", unit.rowsDeep == null ? undefined : `${unit.rowsDeep} RD`],
         ["Fins per inch", unit.finsPerInch == null ? undefined : `${unit.finsPerInch} FPI`],

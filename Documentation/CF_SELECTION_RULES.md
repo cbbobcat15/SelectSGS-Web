@@ -6,14 +6,13 @@ CF (centrifugal fan) evaporators use the same inputs, results table and quote fl
 
 - Total Room Load (TR), number of evaporators, room temperature and target TD (same as STC)
 - Refrigerant: R717 only
-- Tube diameter: 3/4" (D) or 1" (E)
 - Coil material: SS, AL, CU or Steel HDG
 - Defrost type: A, HGC, HGS, HGP, ED or EDL
 - Refrigerant feed: RB, RT, FL or DX
-- ESP (0", 0.25" or 0.5"), hand (RH/LH) and fan discharge (TH/BH/DF/UF); hand and discharge go into the model number
-- Capacity tolerance filters (default -15% / +15%) and an FPI filter (All, 3 or 4)
+- ESP (0", 0.25" or 0.5")
+- Results filters: capacity tolerance (default -15% / +15%), FPI (All, 3 or 4) and Tube Diameter (All, 3/4" or 1")
 
-DX, HGC, ED and EDL are available on 3/4" tube coils only (per the CF selection nomenclature). Copper is only priced for 3/4" tube coils. WD is not offered because the price list has no WD prices.
+DX, HGC, ED and EDL are available on 3/4" tube coils only (per the CF selection nomenclature), so 1" tube units are left out of the results when those or copper are selected. Copper is only priced for 3/4" tube coils. WD is not offered because the price list has no WD prices.
 
 ## Selection process
 
@@ -41,4 +40,4 @@ Options match STC/BTR: a drain pan selector, ten selectable options and three wr
 - HGS, HGP and EDL: the standard pan includes a mill galvanized insulated cover; SS Pan Cover is the upgrade.
 - Other options: SS Casing, Heat Tape in Drain Pan Cover, 24" Extended Legs, Discharge Duct Adapter, Flat Filter Section, Throw Away Filters, 2-Way Louvers, Gold Epoxy Fins, Electrofin and Heresite (coatings are not priced for steel).
 
-Model number: `CF<tube><material><fans><fan size>-<face area><rows><FPI><motor HP>-<feed><refrigerant>-<defrost>-<hand><discharge>`, for example `CFDA2G-331047.5-RBA-HGS-RHTH`; Electrofin and Heresite add `-EF` or `-HC`. Coil weight is the steel weight for Steel HDG and the aluminum weight for other materials.
+Model number: `CF<tube><material><fans><fan size>-<face area><rows>-<FPI>-<motor HP>-<feed><refrigerant>-<defrost>`, for example `CFDA2G-3310-4-7.5-RBA-HGS`; Electrofin and Heresite add `-EF` or `-HC`. Coil weight is the steel weight for Steel HDG and the aluminum weight for other materials.

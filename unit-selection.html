@@ -146,8 +146,7 @@
             font-weight: bold;
         }
 
-        #stc-factor-warning,
-        #cf-factor-warning {
+        #stc-factor-warning {
             color: #a12622;
             font-weight: bold;
         }
@@ -543,12 +542,6 @@
                         <option value="R717" selected>R717</option>
                     </select>
 
-                    <label for="cf-tube">Tube Diameter</label>
-                    <select id="cf-tube" required>
-                        <option value="" selected disabled>Select tube diameter</option>
-                        <option value="D">3/4" (D)</option>
-                        <option value="E">1" (E)</option>
-                    </select>
 
                     <label for="cf-coil-material">Coil Material</label>
                     <select id="cf-coil-material" required>
@@ -586,20 +579,7 @@
                         <option value="0.5">0.5"</option>
                     </select>
 
-                    <label for="cf-hand">Hand</label>
-                    <select id="cf-hand" required>
-                        <option value="RH" selected>RH-Right Hand</option>
-                        <option value="LH">LH-Left Hand</option>
-                    </select>
 
-                    <label for="cf-discharge">Fan Discharge</label>
-                    <select id="cf-discharge" required>
-                        <option value="TH" selected>TH-Top Horizontal</option>
-                        <option value="BH">BH-Bottom Horizontal</option>
-                        <option value="DF">DF-Down Front</option>
-                        <option value="UF">UF-Up Front</option>
-                    </select>
-                    <p id="cf-factor-warning" role="alert" hidden></p>
                 </section>
             </div>
 
@@ -731,6 +711,14 @@
                         <option value="" selected>All</option>
                         <option value="3">3</option>
                         <option value="4">4</option>
+                    </select>
+                </div>
+                <div class="btr-result-filter">
+                    <label for="cf-tube-filter">Tube Diameter</label>
+                    <select id="cf-tube-filter">
+                        <option value="" selected>All</option>
+                        <option value="D">3/4"</option>
+                        <option value="E">1"</option>
                     </select>
                 </div>
             </div>
@@ -1094,14 +1082,11 @@ let cfMatchingUnits = [];
 let selectedCfUnitKey = null;
 const cfSelectionFields = document.getElementById("cf-selection-fields");
 const cfRefrigerantSelect = document.getElementById("cf-refrigerant");
-const cfTubeSelect = document.getElementById("cf-tube");
+const cfTubeFilterSelect = document.getElementById("cf-tube-filter");
 const cfCoilMaterialSelect = document.getElementById("cf-coil-material");
 const cfDefrostTypeSelect = document.getElementById("cf-defrost-type");
 const cfRefrigerantFeedSelect = document.getElementById("cf-refrigerant-feed");
 const cfEspSelect = document.getElementById("cf-esp");
-const cfHandSelect = document.getElementById("cf-hand");
-const cfDischargeSelect = document.getElementById("cf-discharge");
-const cfFactorWarning = document.getElementById("cf-factor-warning");
 const cfResultsPanel = document.getElementById("cf-results-panel");
 const cfResultsRows = document.getElementById("cf-results-rows");
 const cfResultsStatus = document.getElementById("cf-results-status");
@@ -1166,11 +1151,7 @@ function updateBtrSelectionVisibility() {
         !stcHdgDxUnsupported;
     btrResultsPanel.hidden = activeProductLine !== "BTR" || !showAdditionalFields || !selectionsComplete;
     stcResultsPanel.hidden = activeProductLine !== "STC" || !showAdditionalFields || !stcSelectionsComplete;
-    const cfUnsupportedMessage = activeProductLine === "CF" ? getCfUnsupportedMessage() : "";
-    cfFactorWarning.textContent = cfUnsupportedMessage;
-    cfFactorWarning.hidden = !cfUnsupportedMessage;
-    const cfSelectionsComplete = [...cfSelectionFields.querySelectorAll("select")].every(input => input.checkValidity()) &&
-        !cfUnsupportedMessage;
+    const cfSelectionsComplete = [...cfSelectionFields.querySelectorAll("select")].every(input => input.checkValidity());
     cfResultsPanel.hidden = activeProductLine !== "CF" || !showAdditionalFields || !cfSelectionsComplete;
     if (!showAdditionalFields) return;
 
@@ -1193,17 +1174,6 @@ function clearBtrResults() {
     btrResultsRows.replaceChildren();
     btrResultsStatus.textContent = "Click Find Units to refresh the results.";
     addToQuoteButton.disabled = true;
-}
-
-function getCfUnsupportedMessage() {
-    const tube = cfTubeSelect.value;
-    if (tube !== "E") return "";
-    if (cfRefrigerantFeedSelect.value === "DX") return 'DX feed is available on 3/4" tube coils only; select a Recirculated or Flooded feed or 3/4" tube.';
-    if (["HGC", "ED", "EDL"].includes(cfDefrostTypeSelect.value)) {
-        return `${cfDefrostTypeSelect.value} defrost is available on 3/4" tube coils only; select A, HGS or HGP or 3/4" tube.`;
-    }
-    if (cfCoilMaterialSelect.value === "CU") return 'No copper pricing is available for 1" tube coils; select another coil material or 3/4" tube.';
-    return "";
 }
 
 function clearCfResults() {
@@ -1688,6 +1658,11 @@ function getCfBasePrice(pricing, defrostType, fans, fanHp) {
     return basePrice + motorAdder * fans;
 }
 
+function refrigerantFeedRequiresD() {
+    return cfRefrigerantFeedSelect.value === "DX" || ["HGC", "ED", "EDL"].includes(cfDefrostTypeSelect.value) ||
+        cfCoilMaterialSelect.value === "CU";
+}
+
 function findCfUnits() {
     cfMatchingUnits = [];
     selectedCfUnitKey = null;
@@ -1703,17 +1678,12 @@ function findCfUnits() {
         cfResultsStatus.textContent = "Enter Room Load and Target TD to search for CF units.";
         return;
     }
-    const selections = [cfRefrigerantSelect, cfTubeSelect, cfCoilMaterialSelect, cfDefrostTypeSelect,
-        cfRefrigerantFeedSelect, cfEspSelect, cfHandSelect, cfDischargeSelect];
+    const selections = [cfRefrigerantSelect, cfCoilMaterialSelect, cfDefrostTypeSelect,
+        cfRefrigerantFeedSelect, cfEspSelect];
     const invalidSelectionInput = selections.find(input => !input.checkValidity());
     if (invalidSelectionInput) {
         invalidSelectionInput.reportValidity();
-        cfResultsStatus.textContent = "Choose a CF refrigerant, tube diameter, coil material, defrost type, refrigerant feed, ESP, hand and fan discharge.";
-        return;
-    }
-    const unsupportedMessage = getCfUnsupportedMessage();
-    if (unsupportedMessage) {
-        cfResultsStatus.textContent = unsupportedMessage;
+        cfResultsStatus.textContent = "Choose a CF refrigerant, coil material, defrost type, refrigerant feed and ESP.";
         return;
     }
     const invalidFilterInput = [cfCapacityUnderInput, cfCapacityOverInput].find(input =>
@@ -1745,7 +1715,9 @@ function findCfUnits() {
     // Coil temperature above 30°F is a wet coil; at or below 30°F it is a frosted coil (Table 2).
     const targetCoilTemperature = Number(roomTemperatureInput.value) - targetTd;
     const coilRatingCondition = targetCoilTemperature > 30 ? "WET" : "Frosted";
-    const tube = cfTubeSelect.value;
+    const tubeFilter = cfTubeFilterSelect.value;
+    // DX feed, HGC, ED and EDL are available on 3/4" (D) tube coils only; copper is priced for 3/4" tube only.
+    const threeQuarterInchOnly = refrigerantFeedRequiresD();
     const coilMaterial = cfCoilMaterialSelect.value;
     const refrigerantFeed = cfRefrigerantFeedSelect.value;
     const defrostType = cfDefrostTypeSelect.value;
@@ -1757,7 +1729,8 @@ function findCfUnits() {
     const missingCorrectionModels = new Set();
 
     cfMatchingUnits = availableUnits.flatMap(unit => {
-        if (unit.tube !== tube || unit.esp !== esp) return [];
+        if (unit.esp !== esp || (tubeFilter && unit.tube !== tubeFilter)) return [];
+        if (unit.tube === "E" && threeQuarterInchOnly) return [];
         if (fpiFilter !== null && unit.finsPerInch !== fpiFilter) return [];
         if (!Number.isFinite(unit.capacityBtuhPerTd) || !Number.isFinite(unit.faceVelocityFpm)) return [];
         if (unit.faceVelocityFpm > maximumFaceVelocity) return [];
@@ -1801,8 +1774,6 @@ function findCfUnits() {
             refrigerant: cfRefrigerantSelect.value,
             refrigerantFeed,
             defrostType,
-            hand: cfHandSelect.value,
-            fanDischarge: cfDischargeSelect.value,
             pricingModel,
             listPrice,
             coilCapacity,
@@ -2021,7 +1992,7 @@ productLineSelect.addEventListener("change", () => {
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter, #cf-refrigerant, #cf-tube, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-hand, #cf-discharge, #cf-capacity-under, #cf-capacity-over, #cf-fpi-filter")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter, #cf-refrigerant, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-capacity-under, #cf-capacity-over, #cf-fpi-filter, #cf-tube-filter")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -2043,10 +2014,10 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 clearStcResults();
             } else if (input.matches("#stc-capacity-under, #stc-capacity-over, #stc-fpi-filter")) {
                 clearStcResults();
-            } else if (input.matches("#cf-refrigerant, #cf-tube, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-hand, #cf-discharge")) {
+            } else if (input.matches("#cf-refrigerant, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp")) {
                 updateBtrSelectionVisibility();
                 clearCfResults();
-            } else if (input.matches("#cf-capacity-under, #cf-capacity-over, #cf-fpi-filter")) {
+            } else if (input.matches("#cf-capacity-under, #cf-capacity-over, #cf-fpi-filter, #cf-tube-filter")) {
                 clearCfResults();
             }
             if (!selectedUnitModel) return;
@@ -2094,6 +2065,7 @@ document.getElementById("add-to-quote").addEventListener("click", () => {
                 capacityUnder: Number(cfCapacityUnderInput.value),
                 capacityOver: Number(cfCapacityOverInput.value),
                 fpiFilter: cfFpiFilterSelect.value,
+                tubeFilter: cfTubeFilterSelect.value,
                 location: unitRow.location || "",
                 tag: unitRow.tag || ""
             };
@@ -2360,17 +2332,15 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                         selectBtrUnit(savedUnit.model);
                     }
                 } else if (savedUnit.productLine === "CF") {
-                    cfTubeSelect.value = savedUnit.tube ?? "D";
                     cfCoilMaterialSelect.value = savedUnit.coilMaterial ?? "SS";
                     cfDefrostTypeSelect.value = savedUnit.defrostType ?? "A";
                     cfRefrigerantSelect.value = savedUnit.refrigerant ?? "R717";
                     cfRefrigerantFeedSelect.value = savedUnit.refrigerantFeed ?? "RB";
                     cfEspSelect.value = String(savedUnit.esp ?? 0);
-                    cfHandSelect.value = savedUnit.hand ?? "RH";
-                    cfDischargeSelect.value = savedUnit.fanDischarge ?? "TH";
                     cfCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
                     cfCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
                     cfFpiFilterSelect.value = savedUnit.fpiFilter ?? "";
+                    cfTubeFilterSelect.value = savedUnit.tubeFilter ?? "";
                     updateBtrSelectionVisibility();
                     findCfUnits();
                     if (cfMatchingUnits.some(unit => unit.key === savedUnit.key)) {
