@@ -3,10 +3,11 @@
 
 Usage: python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx [dt-product-pricing.js] [SELECTSGS_DATABASE.xlsx]
 
-The 5/8" stainless tube units (DTCB / DTXCB, key prefix DT5B / DTX5B) are not on the price list sheets. Their base
-prices and per-model options come from sheet tbl_PRICE_TABLE_NEW of the SelectSGS database workbook; that sheet's
-3/4" values match the price list sheets exactly, but its list price additions (heat tape, long throw adapter,
-reheat) are older, so the 5/8" units use the stainless sheet's current list price additions.
+When the SelectSGS database workbook is given as the third argument, every DT/DTX price (3/4" and 5/8") comes from its
+sheet tbl_PRICE_TABLE_NEW and the price list sheets are only used for what the database does not contain (the SS fan
+guard and belly band price) and for the list of models. The 5/8" stainless tube units (DTCB / DTXCB, key prefix
+DT5B / DTX5B) exist only in the database. Blow thru (BT / BTX) is a separate product line and is not an option here.
+Differences from the price list sheets are printed when the file is generated.
 
 Each sheet lists the DT models (rows 6-59) followed by the DTX models (rows 60-101). Model names differ by sheet
 (DTDS1-185, DTDC1-185, DT1A-209, DTDB1-209 and the DTX equivalents); they are normalized to
@@ -16,7 +17,7 @@ stainless (B) match the coil material letters of the DT model key.
 Base prices: A / HGC, HGS / HGP (waffle pan), HTS / HTP (tube pan), WD, ED, EDL. A blank or zero price means the
 defrost type is not offered for that model. Options are stored as price arrays in "optionDefinitions" order
 (0 = not offered). Heat tape, long throw adapter and SS fan guard / belly band are priced by number of fans
-(LIST PRICE ADDITIONS); electric reheat is priced per fan section; blow thru and the extra hot gas reheat headers
+(LIST PRICE ADDITIONS); electric reheat is priced per fan section; the extra hot gas reheat headers
 are single prices. The DT list has no motor adder table; the 1/3 and 1/2 HP units are separate models.
 """
 import json, re, sys
@@ -34,12 +35,15 @@ OPTIONS = [("DT_Pan_SS_Ins_Cover", "Full Coverage Drain Pan w/ SS Insulated Cove
            ("DT_Heresite", "Heresite Coating", 14),
            ("DT_Two_Speed_Motor", "1/2 HP 3 Phase Two Speed Motor", 15),
            ("DT_Inverter_Duty_Motor", "1/2 HP 3Ph Washdown Inverter Duty Motor", 16),
-           ("DT_Heat_Tape", "Heat Tape in Drain Pan Cover", ("fans", 2)),
+           ("DT_Heat_Tape_115", "Heat Tape in Full Coverage Drain Pan Cover - 115 Volt", ("fans", 2)),
+           ("DT_Heat_Tape_230", "Heat Tape in Full Coverage Drain Pan Cover - 230 Volt", ("fans", 2)),
            ("DT_Long_Throw_Adapter", "Long Throw Adapter", ("fans", 3)),
            ("DT_SS_Fan_Guard", "SS Fan Guard & Belly Band", ("fans", 4)),
-           ("DT_Blow_Thru", "Blow Thru Configuration (6 Row Only)", ("flat", "H116")),
            ("DT_Electric_Reheat", "4.65 KW Electric Reheat Per Fan Section (6 Rows Only)", ("perfan", "H118")),
-           ("DT_Add_Hdrs_HGR", "Add'l Set of Hdrs for Hot Gas Reheat, or Distributor & Hdr", ("flat", "H119"))]
+           ("DT_Add_Hdrs_HGR", "Add'l Set of Hdrs for Hot Gas Reheat, or Distributor & Hdr", ("flat", "H119")),
+           ("DT_Brass_Distributor", "Brass Distributor on Steel Coil", ("none",)),
+           ("DT_TEV_Mount", "Mounted TEV (Copper Coils Only)", ("none",)),
+           ("DT_Coil_End_Covers", "Coil End Covers (ED/EDL/WD)", ("none",))]
 
 DB_OPTION_CODES = ["FCPan_SS_IA_IHGC_IED", "FCPan_SS_Welded_IA_IHGC_IED", "FCPan_SS_Welded_HGP_HGS_HTP_HTS", "SS_Casing",
                    "Gold_Epx_Pre", "Elec_Fin_Coat", "Heresite_C", "Motor_Eff_0.5_2S", "inv_ready_mtr"]
@@ -59,46 +63,78 @@ def normalize(code):
         series, material, fans, digits = m.group(1), m.group(2), m.group(3), m.group(4)
     return f"{series}{material}{fans}-{digits}"
 
-def add_five_eighths(models, database, additions):
-    by_fans, flat = additions
+DB_BASE_CODES = {"A_HGC": ("Base_A", "Base_HGC"), "HGS_HGP": ("Base_HGS", "Base_HGP"), "HTS_HTP": ("Base_HTS", "Base_HTP"),
+                 "WD": ("Base_WD",), "ED": ("Base_ED",), "EDL": ("Base_EDL",)}
+# Option id -> database option code. Heat tape, long throw and gold epoxy prices already include the fan count in the
+# database; electric reheat is a per fan section price. SS fan guard is not in the database (price list value).
+DB_OPTION_MAP = {"DT_Pan_SS_Ins_Cover": "FCPan_SS_IA_IHGC_IED", "DT_Pan_Hygienic_IA": "FCPan_SS_Welded_IA_IHGC_IED",
+                 "DT_Pan_Hygienic_HG": "FCPan_SS_Welded_HGP_HGS_HTP_HTS", "DT_SS_Casing": "SS_Casing",
+                 "DT_Gold_Epoxy_Fins": "Gold_Epx_Pre", "DT_Electrofin": "Elec_Fin_Coat", "DT_Heresite": "Heresite_C",
+                 "DT_Two_Speed_Motor": "Motor_Eff_0.5_2S", "DT_Inverter_Duty_Motor": "inv_ready_mtr",
+                 "DT_Heat_Tape_115": "FCPan_HeatTape_115", "DT_Heat_Tape_230": "FCPan_HeatTape_230",
+                 "DT_Brass_Distributor": "Brass_Distr", "DT_TEV_Mount": "TEV_Mount", "DT_Coil_End_Covers": "Coil_End_Covers",
+                 "DT_Long_Throw_Adapter": "Long_Throw",
+                 "DT_Electric_Reheat": "Reheat_per_Fan_6R", "DT_Add_Hdrs_HGR": "Add_Head_HGR_D"}
+
+def database_key(code):
+    m = re.match(r"^(DTX?)(?:D([SCAB])|C(B))(\d)-(\d+)$", code)
+    if not m:
+        return None
+    series, material, five_eighths, fans, digits = m.groups()
+    return f"{series}{'5B' if five_eighths else material}{fans}-{digits}"
+
+def apply_database(models, database, sheet_additions):
+    """Price every DT/DTX model (3/4" and 5/8") from tbl_PRICE_TABLE_NEW; return a list of differences from the sheets."""
     wb = openpyxl.load_workbook(database, read_only=True, data_only=True)
     db = {}
     for row in wb["tbl_PRICE_TABLE_NEW"].iter_rows(min_row=2, values_only=True):
-        if row[0] and re.match(r"^DTX?[CD]B\d-\d+$", str(row[0])):
-            db.setdefault(row[0], {})[row[7]] = num(row[9])
-    # The database's 3/4" stainless model prices must equal the price list sheets before its 5/8" prices are trusted.
-    checked = mismatches = 0
+        if row[0] and re.match(r"^DTX?(D[SCAB]|CB)\d-\d+$", str(row[0])):
+            db.setdefault(row[0], {}).setdefault(row[7], num(row[9]))
+    by_key = {}
     for code, values in db.items():
-        m = re.match(r"^(DTX?)DB(\d)-(\d+)$", code)
-        if not m:
-            continue
-        sheet = models.get(f"{m.group(1)}B{m.group(2)}-{m.group(3)}")
-        for base_code, key in (("Base_A", "A_HGC"), ("Base_HGS", "HGS_HGP"), ("Base_HTS", "HTS_HTP"), ("Base_ED", "ED"), ("Base_EDL", "EDL")):
-            if sheet and key in sheet["basePrices"]:
-                checked += 1
-                mismatches += abs(values.get(base_code, 0) - sheet["basePrices"][key]) > 0.5
-    assert checked > 300 and mismatches == 0, (checked, mismatches)
-    count = 0
-    for code, values in sorted(db.items()):
-        m = re.match(r"^(DTX?)CB(\d)-(\d+)$", code)
-        if not m:
-            continue
-        series, fans, digits = m.group(1), int(m.group(2)), m.group(3)
-        base = {key: round(values[f"Base_{name}"], 2) for name, key in DB_BASE.items() if values.get(f"Base_{name}")}
+        key = database_key(code)
+        if key:
+            by_key[key] = values
+    sheet_guard = {mat: adds[0] for mat, adds in sheet_additions.items()}
+    differences = []
+    result = {}
+    for key in sorted(set(models) | {k for k in by_key if k.startswith(("DT5B", "DTX5B"))}):
+        values = by_key.get(key)
+        if values is None:
+            raise SystemExit(f"No database prices for {key}")
+        series, material, fans, digits = re.match(r"^(DTX?)(5B|[SCAB])(\d)-(\d+)$", key).groups()
+        fans = int(fans)
+        base = {}
+        for name, codes in DB_BASE_CODES.items():
+            prices = [values[c] for c in codes if values.get(c)]
+            assert len(set(prices)) <= 1, (key, name, prices)
+            if prices:
+                base[name] = round(prices[0], 2)
         if "A_HGC" not in base:
             continue
-        options = [round(values.get(c) or 0, 2) for c in DB_OPTION_CODES]
-        for oid, label, source in OPTIONS[len(DB_OPTION_CODES):]:
-            if source[0] == "fans":
-                price = by_fans[fans][source[1] - 2]
-            elif source[0] == "flat":
-                price = flat[source[1]]
+        old = models.get(key)
+        if old:
+            for name in set(base) | set(old["basePrices"]):
+                if abs(base.get(name, 0) - old["basePrices"].get(name, 0)) > 0.5:
+                    differences.append((key, "base " + name, old["basePrices"].get(name), base.get(name)))
+        guard_by_fans = sheet_guard["B" if material == "5B" else material]
+        options = []
+        for index, (oid, label, source) in enumerate(OPTIONS):
+            code = DB_OPTION_MAP.get(oid)
+            if code:
+                price = values.get(code) or 0
+                if oid == "DT_Electric_Reheat":
+                    price *= fans
+            elif oid == "DT_SS_Fan_Guard":
+                price = guard_by_fans[fans][2]
             else:
-                price = flat[source[1]] * fans
+                raise SystemExit(f"No price source for {oid}")
             options.append(round(price, 2) if price else 0)
-        models[f"{series}5B{fans}-{digits}"] = {"basePrices": base, "options": options}
-        count += 1
-    print(count, "5/8 inch stainless models added from the database;", checked, "3/4 inch base prices matched the sheets")
+            if old and abs((old["options"][index] or 0) - options[-1]) > 0.5:
+                differences.append((key, oid, old["options"][index], options[-1]))
+        entry = {"basePrices": base, "options": options}
+        result[key] = entry
+    return result, differences
 
 def main(xlsx, out, database=None):
     wb = openpyxl.load_workbook(xlsx, data_only=True)
@@ -125,6 +161,8 @@ def main(xlsx, out, database=None):
             for oid, label, source in OPTIONS:
                 if isinstance(source, int):
                     price = num(row[source])
+                elif source[0] == "none":
+                    price = 0
                 elif source[0] == "fans":
                     price = by_fans[fans][source[1] - 2]
                 elif source[0] == "flat":
@@ -136,7 +174,13 @@ def main(xlsx, out, database=None):
             models[key] = {"basePrices": base, "options": options}
     assert len(models) == 4 * 96, len(models)
     if database:
-        add_five_eighths(models, database, sheet_additions["B"])
+        models, differences = apply_database(models, database, sheet_additions)
+        print(len(differences), "price differences versus the price list sheets (database values used):")
+        summary = {}
+        for key, field, old, new in differences:
+            summary.setdefault(field, []).append((key, old, new))
+        for field, items in sorted(summary.items()):
+            print(" ", field, len(items), "models, e.g.", items[0])
     with open(out, "w", encoding="utf-8") as f:
         f.write("window.selectSgsDtProductPricing = " +
                 json.dumps({"optionDefinitions": [{"id": o[0], "label": o[1], "uom": "per Unit"} for o in OPTIONS],

@@ -929,7 +929,7 @@ const writeInOptionRows = document.getElementById("write-in-option-rows");
 const optionLineCount = 12;
 const btrSelectableOptionLineCount = 6;
 const cfSelectableOptionLineCount = 10;
-const dtSelectableOptionLineCount = 12;
+const dtSelectableOptionLineCount = 14;
 const writeInOptionCount = 3;
 const btrNoCoverOptionId = "btr-drain-pan-no-cover";
 const btrInsulatedCoverOptionId = "btr-drain-pan-ss-cover";
@@ -1048,7 +1048,7 @@ function getCfModelNumber(unit) {
 
 // DT/DTX model number: <DT|DTX|BT|BTX>D<material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>,
 // e.g. DTDS1-185-RBA-HGS or DTXDA3-881-DXA-IA-ERH-EF. A, HGC and ED become IA, IHGC and IED when an insulated pan
-// cover is selected; the Blow Thru option changes DT/DTX to BT/BTX.
+// cover is selected.
 function isDtUnit(unit) {
     return unit?.productLine === "DT";
 }
@@ -1070,8 +1070,7 @@ function getDtModelNumber(unit) {
         : selectedIds.includes("DT_Heresite") ? "-HC"
         : selectedIds.includes("DT_Gold_Epoxy_Fins") ? "-GF" : "";
     const series = unit.series === "DTX" ? "DTX" : "DT";
-    const prefix = selectedIds.includes("DT_Blow_Thru") ? series.replace("DT", "BT") : series;
-    return `${prefix}${unit.tube === "C" ? "C" : "D"}${materialCode}${unit.fans}-${digits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
+    return `${series}${unit.tube === "C" ? "C" : "D"}${materialCode}${unit.fans}-${digits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
 }
 
 function getEvaporatorModelNumber(unit) {
@@ -1542,11 +1541,12 @@ function getProductPricing(unit) {
             if (dtPanCoverOptionIds.includes(id)) return panCoverOptions.includes(id);
             // Only gold epoxy fins can be combined with defrost heaters.
             if (electricDefrost && ["DT_Electrofin", "DT_Heresite"].includes(id)) return false;
-            // Reheat is for aluminum and copper tube coils; electric reheat and blow thru are 6 row units only.
+            // Reheat is for aluminum and copper tube coils; electric reheat is for 6 row units only.
             if (["DT_Electric_Reheat", "DT_Add_Hdrs_HGR"].includes(id) && !["AL", "CU"].includes(unit.coilMaterial)) return false;
-            if (["DT_Electric_Reheat", "DT_Blow_Thru"].includes(id) && !sixRows) return false;
-            // Blow thru units are for rooms above 20°F only.
-            if (id === "DT_Blow_Thru" && !(Number(unit.roomTemperature) > 20)) return false;
+            if (id === "DT_Electric_Reheat" && !sixRows) return false;
+            if (id === "DT_Brass_Distributor") return unit.coilMaterial === "HDG";
+            if (id === "DT_TEV_Mount") return unit.coilMaterial === "CU" && unit.refrigerantFeed === "DX";
+            if (id === "DT_Coil_End_Covers") return ["ED", "EDL", "WD"].includes(unit.defrostType);
             return true;
         };
         return {

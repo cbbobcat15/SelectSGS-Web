@@ -20,14 +20,14 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 
 ## Pricing and options
 
-- Base prices are per model and defrost type from the price list (no motor adders; 1/3 and 1/2 HP units are separate models). Options are per Unit: drain pan covers (insulated, hygienic), SS casing, coatings (gold epoxy, Electrofin, Heresite), two-speed and inverter-duty motors, heat tape, long throw adapter, SS fan guard and belly band, blow thru (6 row units in rooms above 20°F), electric reheat (6 row AL/CU units, priced per fan section) and the additional hot gas reheat headers (AL/CU).
+- Base prices are per model and defrost type from the SelectSGS database workbook (`tbl_PRICE_TABLE_NEW`; they equal the price list) (no motor adders; 1/3 and 1/2 HP units are separate models). Options are per Unit: drain pan covers (insulated, hygienic), SS casing, coatings (gold epoxy, Electrofin, Heresite), two-speed and inverter-duty motors, heat tape (separate 115 V and 230 V options), long throw adapter, SS fan guard and belly band, brass distributor (steel coils only), mounted TEV (copper DX only), coil end covers (ED, EDL and WD), electric reheat (6 row AL/CU units, priced per fan section) and the additional hot gas reheat headers (AL/CU).
 - Drain pan selector: A/HGC/ED offer the insulated SS cover or hygienic cover (the model number becomes IA/IHGC/IED); HGS/HGP/HTS/HTP/EDL include a mill galvanized insulated cover and can upgrade to the hygienic cover; WD has no cover options.
 - Electrofin and Heresite are not offered with ED/EDL (only gold epoxy fins are compatible with defrost heaters).
 - Twelve selectable option rows, plus the drain pan row and three write-ins.
 
 ## Model number
 
-`<DT|DTX|BT|BTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR; coating is -EF, -HC or -GF; selecting Blow Thru changes DT/DTX to BT/BTX. Coil connection hand is not a selection input and is omitted.
+`<DT|DTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR; coating is -EF, -HC or -GF. Coil connection hand is not a selection input and is omitted.
 
 ## Dimensions
 
@@ -36,6 +36,6 @@ Length by fan count (52.375, 80.38, 108.5, 136.25, 164.25, 192.25 in), depth 41.
 ## Data files
 
 - `dt-ratings.js`: `python3 -I tools/generate-dt-ratings.py DT_DTX_Unit_Data_Tables.xlsx dt-ratings.js` (the workbook transcribed from PDF pages 9–14).
-- `dt-product-pricing.js`: `python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx dt-product-pricing.js SELECTSGS_DATABASE.xlsx`. The 5/8" units are not on the price list sheets; their base and per-model option prices come from the database workbook (`tbl_PRICE_TABLE_NEW`, models DTCB/DTXCB). The generator first checks that the database's 3/4" stainless base prices match the price list sheets (420 prices, all equal), and uses the price list's current list price additions (heat tape, long throw adapter, reheat) because the database's are older.
+- `dt-product-pricing.js`: `python3 -I tools/generate-dt-pricing.py PRICE_LIST.xlsx dt-product-pricing.js SELECTSGS_DATABASE.xlsx`. All DT/DTX prices (3/4" and 5/8" models) come from the database workbook (`tbl_PRICE_TABLE_NEW`); base prices equal the price list. Option prices follow the database: heat tape, long throw adapter and gold epoxy are model prices that already include the fan count, electric reheat is 2,732 per fan section and the extra hot gas reheat headers are 1,650. The SS fan guard and belly band price is not in the database and still comes from the price list. Blow thru (BT/BTX) is a separate product line and is not offered as a DT/DTX option. The generator prints every difference from the price list sheets.
 
 Known PDF issues carried as printed: model 3-720 (DTX) lists "2 x 1/3" fans (the fan count is taken from the model number, 3); face area and coil volume for 5-1270 and 6-1530 look rounded; 6-1441 face velocity does not match CFM ÷ face area.
