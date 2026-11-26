@@ -916,7 +916,7 @@ const deleteProjectButton = document.getElementById("delete-project");
 const unitList = document.getElementById("unit-list");
 const unitRowsBody = document.getElementById("unit-rows-body");
 const defaultUnitRowCount = 10;
-const maxUnitRowCount = 50;
+const maxUnitRowCount = 100;
 const unitRows = [];
 const exportQuoteButton = document.getElementById("export-quote");
 const lineItemActions = document.getElementById("line-item-actions");
@@ -933,7 +933,7 @@ const writeInOptionRows = document.getElementById("write-in-option-rows");
 const optionLineCount = 12;
 const btrSelectableOptionLineCount = 6;
 const cfSelectableOptionLineCount = 10;
-const dtSelectableOptionLineCount = 14;
+const dtSelectableOptionLineCount = 15;
 const writeInOptionCount = 3;
 const btrNoCoverOptionId = "btr-drain-pan-no-cover";
 const btrInsulatedCoverOptionId = "btr-drain-pan-ss-cover";
@@ -1069,7 +1069,7 @@ function getDtModelNumber(unit) {
         HGC: insulatedPanSelected ? "IHGC" : "HGC",
         ED: insulatedPanSelected ? "IED" : "ED"
     }[unit.defrostType] ?? unit.defrostType;
-    const reheat = selectedIds.includes("DT_Electric_Reheat") ? "-ERH" : selectedIds.includes("DT_Add_Hdrs_HGR") ? "-HGR" : "";
+    const reheat = selectedIds.includes("DT_Electric_Reheat") ? "-ERH" : unit.reheatCoil === "HGR" ? "-HGR" : "";
     const coating = selectedIds.includes("DT_Electrofin") ? "-EF"
         : selectedIds.includes("DT_Heresite") ? "-HC"
         : selectedIds.includes("DT_Gold_Epoxy_Fins") ? "-GF" : "";
@@ -1546,7 +1546,10 @@ function getProductPricing(unit) {
             // Only gold epoxy fins can be combined with defrost heaters.
             if (electricDefrost && ["DT_Electrofin", "DT_Heresite"].includes(id)) return false;
             // Reheat is for aluminum and copper tube coils; electric reheat is for 6 row units only.
+            if (id === "DT_Add_Head_HGR") return unit.reheatCoil === "HGR";
             if (["DT_Electric_Reheat", "DT_Add_Hdrs_HGR"].includes(id) && !["AL", "CU"].includes(unit.coilMaterial)) return false;
+            // Electric reheat cannot be combined with the hot gas reheat coil.
+            if (id === "DT_Electric_Reheat" && unit.reheatCoil === "HGR") return false;
             if (id === "DT_Electric_Reheat" && !sixRows) return false;
             if (id === "DT_Brass_Distributor") return unit.coilMaterial === "HDG";
             if (id === "DT_TEV_Mount") return unit.coilMaterial === "CU" && unit.refrigerantFeed === "DX";
@@ -1727,6 +1730,22 @@ function getUnitOptions(unit) {
         if (drainPanIndex === -1) unit.options[0].optionId = isDtUnit(unit) ? dtStandardPanOptionId : cfStandardPanOptionId;
     }
 
+    // HGR reheat coil (as on the BTR): the additional set of headers is a required, locked second line.
+    if (isDtUnit(unit) && unit.reheatCoil === "HGR" && availableOptionIds.has("DT_Add_Head_HGR")) {
+        const drainPan = unit.options[0];
+        const selectedOptions = unit.options.slice(1).filter(option =>
+            option.optionId && option.optionId !== "DT_Add_Head_HGR"
+        ).slice(0, lineCount - 2);
+        unit.options.splice(
+            0,
+            unit.options.length,
+            drainPan,
+            { optionId: "DT_Add_Head_HGR", quantity: 1 },
+            ...selectedOptions,
+            ...Array.from({ length: lineCount - selectedOptions.length - 2 }, () => ({ optionId: "", quantity: 1 }))
+        );
+    }
+
     return unit.options;
 }
 
@@ -1823,7 +1842,7 @@ function renderOptionRows(options, unit) {
     selectableOptions.forEach((option, rowIndex) => {
         const index = isBtr ? rowIndex + 1 : rowIndex;
         const row = document.createElement("tr");
-        const isRequiredReheatOption = isBtr && unit.reheatCoil === "HGR" && index === 1;
+        const isRequiredReheatOption = (isBtr || isDtUnit(unit)) && unit.reheatCoil === "HGR" && index === 1;
         row.innerHTML = `
             <td><select data-option-select="${index}" aria-label="Selectable option ${rowIndex + 1}" ${isRequiredReheatOption ? "disabled" : ""}>
                 <option value="">Select an option</option>
@@ -2693,7 +2712,7 @@ optionsPanel.addEventListener("input", event => {
 
     const quantity = Number(quantityInput.value);
     const index = Number(quantityInput.dataset.optionQuantity);
-    if (quotedUnits[activeUnitNumber].productLine === "BTR" &&
+    if ((quotedUnits[activeUnitNumber].productLine === "BTR" || isDtUnit(quotedUnits[activeUnitNumber])) &&
         quotedUnits[activeUnitNumber].reheatCoil === "HGR" && index === 1) return;
     const isValid = Number.isInteger(quantity) && quantity >= 1;
     quantityInput.setCustomValidity(isValid ? "" : "Enter a quantity of at least 1.");
@@ -2715,7 +2734,7 @@ optionsPanel.addEventListener("change", event => {
     if (select && Number.isInteger(activeUnitNumber) && quotedUnits[activeUnitNumber]) {
         const index = Number(select.dataset.optionSelect);
         const activeUnit = quotedUnits[activeUnitNumber];
-        if (activeUnit.productLine === "BTR" && activeUnit.reheatCoil === "HGR" && index === 1) return;
+        if ((activeUnit.productLine === "BTR" || isDtUnit(activeUnit)) && activeUnit.reheatCoil === "HGR" && index === 1) return;
         const options = getUnitOptions(activeUnit);
         if (select.value === deselectOptionValue) {
             if (usesEvaporatorOptionLayout(activeUnit)) {

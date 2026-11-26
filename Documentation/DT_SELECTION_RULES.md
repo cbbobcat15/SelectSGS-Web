@@ -7,6 +7,7 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 - Refrigerant: R717, R22, R404A or R507. Copper tube coils cannot be used with ammonia (PDF 4.2), so R717 offers SS, AL and Steel HDG, and the halocarbons offer CU only. Capacities are the same steel/copper table values (PDF note: use the copper tube capacities for R-22/404A/507A).
 - Defrost type: A, HGC, HGS/HGP (waffle pan, series/parallel), HTS/HTP (tube pan, series/parallel), WD (6 row units only) and ED/EDL (not offered on steel coils). Units without a price for the chosen material and defrost type are not offered.
 - Refrigerant feed: RB, RT, FL, or DX. DX uses the DX rating columns; RB, RT and FL use the REC (recirculated/flooded) columns.
+- Reheat Coil: None or HGR (hot gas reheat), the same process as the BTR. The coil is rated with the selected rows, and the unit is the same model with two more rows, so air flow, face velocity (and the 630 FPM limit), surface area, volume, weight and the price come from that model; the results show `DT-5-1034/2` and `6+2` rows. The additional set of headers (Add_Head_HGR, REHEAT_CODE = HGR in the database) is added automatically as a required, locked option line. HGR is offered for AL, SS and CU coils, and is unavailable for 8-row coils and 6 FPI coils because the data has no 10-row or 8-row 6 FPI models (and WD is priced for 6-row units only). Electric reheat cannot be combined with it.
 - ESP is 0" only (ratings are for 0" ESP) and there is no ESP selection. Tube is 3/4" for every material except stainless, which is also offered with 5/8" tube (Tube Diameter results filter).
 - Results filters: FPI (3, 4, 6), Rows Deep (6, 8) and Series (DT, DTX), Tube Diameter (3/4", 5/8") and the capacity tolerances. Default sort is List Price ascending; every column sorts.
 
@@ -27,7 +28,7 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 
 ## Model number
 
-`<DT|DTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR; coating is -EF, -HC or -GF. Coil connection hand is not a selection input and is omitted.
+`<DT|DTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR (an HGR reheat coil adds `-HGR` only, e.g. `DTDA5-1034-RBA-A-HGR`; no `/2`); coating is -EF, -HC or -GF. Coil connection hand is not a selection input and is omitted.
 
 ## Dimensions
 
