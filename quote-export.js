@@ -498,7 +498,7 @@
             ["Quote #:", project.quoteNumber], ["Unit Location:", unit.location], ["Unit Tag:", unit.tag]
         ];
         header.forEach(([label, value], index) => addRow(8 + index, [
-            cell("A", 8 + index, label, 3), cell("B", 8 + index, value, 38)
+            cell("B", 8 + index, label, 3), cell("C", 8 + index, value, 38)
         ]));
 
         let row = 14;
@@ -509,12 +509,12 @@
             for (const [leftLabel, leftValue, leftUnit, rightLabel, rightValue, rightUnit] of lines) {
                 const cells = [];
                 if (leftLabel) {
-                    cells.push(cell("A", row, leftLabel, 25), cell("B", row, leftValue, valueStyle));
-                    if (leftUnit) cells.push(cell("C", row, leftUnit, 38));
+                    cells.push(cell("A", row, leftLabel, 25), cell("C", row, leftValue, valueStyle));
+                    if (leftUnit) cells.push(cell("D", row, leftUnit, 38));
                 }
                 if (rightLabel) {
-                    cells.push(cell("E", row, rightLabel, 25), cell("F", row, rightValue, valueStyle));
-                    if (rightUnit) cells.push(cell("G", row, rightUnit, 38));
+                    cells.push(cell("G", row, rightLabel, 25), cell("I", row, rightValue, valueStyle));
+                    if (rightUnit) cells.push(cell("J", row, rightUnit, 38));
                 }
                 addRow(row++, cells);
             }
@@ -571,13 +571,9 @@
 
         const headerRows = templateXml.match(/<row r="1"[\s\S]*?(?=<row r="6")/)?.[0];
         if (!headerRows) throw new Error("The quote template header rows could not be found.");
-        const widths = [27, 17, 11, 3.3, 27, 16, 11, 12, 12, 12];
-        const cols = widths.map((width, index) =>
-            `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`
-        ).join("");
+        // Column widths stay as in the Item EC sheet so the sheet is the same size and the logo is not stretched.
         return templateXml
             .replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:J${row}"/>`)
-            .replace(/<cols>[\s\S]*?<\/cols>/, `<cols>${cols}</cols>`)
             .replace(/<sheetData>[\s\S]*<\/sheetData>/, () => `<sheetData>${headerRows}${rows.join("")}</sheetData>`)
             .replace(/<mergeCells[\s\S]*?<\/mergeCells>/, "");
     }
@@ -896,7 +892,7 @@
 
         const exportDate = new Date().toISOString().slice(0, 10);
         const templateUrl = new URL("quote-template.xlsx", document.baseURI);
-        templateUrl.searchParams.set("v", "20261125-1200");
+        templateUrl.searchParams.set("v", "20261126-1015");
         const templateResponse = await fetch(templateUrl, { cache: "no-store" });
         if (!templateResponse.ok) {
             throw new Error(`The quote template could not be loaded (HTTP ${templateResponse.status}).`);
