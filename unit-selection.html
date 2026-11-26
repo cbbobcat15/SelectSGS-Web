@@ -2661,7 +2661,7 @@ function renderDtResultsRows() {
         row.tabIndex = 0;
         row.setAttribute("aria-selected", String(unit.key === selectedDtUnitKey));
         const values = [
-            `${unit.model}${unit.reheatCoil === "HGR" ? "/2" : ""}`,
+            unit.model,
             unit.reheatCoil === "HGR" ? `${unit.rowsDeep}+2` : unit.rowsDeep,
             unit.finsPerInch,
             formatBtrNumber(unit.coilCapacity, 0),
