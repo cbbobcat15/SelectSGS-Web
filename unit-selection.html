@@ -674,6 +674,12 @@
                         <option value="FL">FL-Flooded</option>
                         <option value="DX">DX</option>
                     </select>
+
+                    <label for="dt-reheat-coil">Reheat Coil</label>
+                    <select id="dt-reheat-coil">
+                        <option value="">None</option>
+                        <option value="HGR">HGR-Hot Gas Reheat</option>
+                    </select>
                 </section>
             </div>
 
@@ -1339,6 +1345,7 @@ const dtRefrigerantSelect = document.getElementById("dt-refrigerant");
 const dtCoilMaterialSelect = document.getElementById("dt-coil-material");
 const dtDefrostTypeSelect = document.getElementById("dt-defrost-type");
 const dtRefrigerantFeedSelect = document.getElementById("dt-refrigerant-feed");
+const dtReheatCoilSelect = document.getElementById("dt-reheat-coil");
 const dtResultsPanel = document.getElementById("dt-results-panel");
 const dtResultsRows = document.getElementById("dt-results-rows");
 const dtResultsStatus = document.getElementById("dt-results-status");
@@ -2448,6 +2455,9 @@ function syncDtSelectionOptions() {
         if (option.value === "ED" || option.value === "EDL") option.disabled = steel;
     }
     if (dtDefrostTypeSelect.selectedOptions[0]?.disabled && dtDefrostTypeSelect.value) dtDefrostTypeSelect.value = "";
+    // Hot gas reheat is priced for AL, SS and CU coils (same as the BTR); there is no steel reheat coil.
+    dtReheatCoilSelect.querySelector('option[value="HGR"]').disabled = steel;
+    if (steel) dtReheatCoilSelect.value = "";
 }
 
 syncDtSelectionOptions();
@@ -2532,6 +2542,9 @@ function findDtUnits() {
     const seriesFilter = dtSeriesFilterSelect.value;
     const tubeFilter = dtTubeFilterSelect.value;
     const maximumFaceVelocity = roomTemperature > 34 ? 630 : Infinity;
+    // Hot gas reheat (same process as the BTR): the coil is rated with the selected rows, but the unit is the
+    // same model with two more rows, so air flow, face velocity, geometry and price come from that model.
+    const hasReheat = dtReheatCoilSelect.value === "HGR";
     // Only DX-frosted ratings are corrected for low suction temperature.
     const lowSuctionFactor = coilRatingCondition === "Frosted" && refrigerantFeed === "DX"
         ? getDtLowSuctionFactor(targetCoilTemperature)
@@ -2549,7 +2562,14 @@ function findDtUnits() {
         if (rowsFilter !== null && unit.rowsDeep !== rowsFilter) return [];
         const ratedCapacity = unit[ratingKey];
         if (!Number.isFinite(ratedCapacity) || !Number.isFinite(unit.faceVelocityFpm)) return [];
-        if (unit.faceVelocityFpm > maximumFaceVelocity) return [];
+        const physicalUnit = hasReheat
+            ? availableUnits.find(candidate =>
+                candidate.series === unit.series && candidate.tube === unit.tube && candidate.fans === unit.fans &&
+                candidate.fanHp === unit.fanHp && candidate.finsPerInch === unit.finsPerInch &&
+                candidate.rowsDeep === unit.rowsDeep + 2 && Number.isFinite(candidate.weightsLb?.[coilMaterial]))
+            : unit;
+        if (!physicalUnit) return [];
+        if (!Number.isFinite(physicalUnit.faceVelocityFpm) || physicalUnit.faceVelocityFpm > maximumFaceVelocity) return [];
         const appliedCapacityCorrections = lowSuctionFactor === 1
             ? []
             : [{ label: "Low suction temperature (DX frosted)", factor: lowSuctionFactor }];
@@ -2557,7 +2577,7 @@ function findDtUnits() {
         const capacityDifference = (coilCapacity - targetCapacity) / targetCapacity * 100;
         if (capacityDifference < minimumDifference || capacityDifference > maximumDifference) return [];
 
-        const pricingModel = `${unit.series}${unit.tube === "C" ? "5" : ""}${dtCoilMaterialCodes[coilMaterial]}${unit.fans}-${unit.model.split("-")[1]}`;
+        const pricingModel = `${physicalUnit.series}${physicalUnit.tube === "C" ? "5" : ""}${dtCoilMaterialCodes[coilMaterial]}${physicalUnit.fans}-${physicalUnit.model.split("-")[1]}`;
         const pricing = pricingData.models[pricingModel];
         const listPrice = pricing?.basePrices?.[dtDefrostPriceKeys[defrostType]];
         // Units that cannot be priced for the selected material and defrost type are not offered.
@@ -2566,6 +2586,14 @@ function findDtUnits() {
             ...unit,
             model: `${unit.series}-${unit.model}`,
             key: `${unit.series}|${unit.model}|${unit.tube}`,
+            ...(hasReheat ? {
+                reheatCoil: "HGR",
+                reheatModel: `${physicalUnit.series}-${physicalUnit.model}`,
+                airFlowCfm: physicalUnit.airFlowCfm,
+                faceArea: physicalUnit.faceArea,
+                surfaceAreaSqFt: physicalUnit.surfaceAreaSqFt,
+                coilVolumeFt3: physicalUnit.coilVolumeFt3
+            } : {}),
             coilMaterial,
             refrigerant: dtRefrigerantSelect.value,
             refrigerantFeed,
@@ -2577,10 +2605,11 @@ function findDtUnits() {
             appliedCapacityCorrections,
             capacityDifference,
             coilRatingCondition,
-            faceVelocity: unit.faceVelocityFpm,
+            faceVelocity: physicalUnit.faceVelocityFpm,
+            faceVelocityFpm: physicalUnit.faceVelocityFpm,
             fanHpTotal: unit.fans * unit.fanHp,
             fanHpLabel: `${unit.fans} x ${unit.fanHpText}`,
-            coilWeightLb: unit.weightsLb[coilMaterial],
+            coilWeightLb: physicalUnit.weightsLb[coilMaterial],
             esp: 0,
             dimensionsIn: window.selectSgsDtDimensions?.[unit.series]?.[String(unit.fans)] ?? null
         }];
@@ -2589,12 +2618,13 @@ function findDtUnits() {
     renderDtResultsRows();
     const dtNotes = [
         targetTd > 20 ? "DT/DTX ratings are valid for TDs of 20°F or less." : "",
+        hasReheat ? "HGR adds two rows to the selected coil, so it is unavailable for 8-row and 6 FPI coils (no 10-row or 8-row 6 FPI data)." : "",
         dtMatchingUnits.some(unit => unit.tube === "C")
             ? "5/8\" tube air flow, face velocity and surface area are copied from the 3/4\" coil and are pending factory review." : ""
     ].filter(Boolean);
     dtResultsStatus.textContent = dtMatchingUnits.length
         ? dtNotes.length ? `Note: ${dtNotes.join(" ")}` : ""
-        : `No DT/DTX coils match the selected capacity range and ${coilRatingCondition} rating condition.`;
+        : `No DT/DTX coils match the selected capacity range and ${coilRatingCondition} rating condition.${hasReheat ? " " + dtNotes.filter(note => note.startsWith("HGR")).join(" ") : ""}`;
 }
 
 let dtSortKey = "listPrice";
@@ -2632,7 +2662,7 @@ function renderDtResultsRows() {
         row.setAttribute("aria-selected", String(unit.key === selectedDtUnitKey));
         const values = [
             unit.model,
-            unit.rowsDeep,
+            unit.reheatCoil === "HGR" ? `${unit.rowsDeep}+2` : unit.rowsDeep,
             unit.finsPerInch,
             formatBtrNumber(unit.coilCapacity, 0),
             `${unit.capacityDifference > 0 ? "+" : ""}${unit.capacityDifference.toFixed(1)}%`,
@@ -2794,7 +2824,7 @@ productLineSelect.addEventListener("change", () => {
             : `Enter design conditions and click Find Unit to search ${activeProductLine} models.`;
 });
 
-for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter, #cf-refrigerant, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-capacity-under, #cf-capacity-over, #cf-fpi-filter, #cf-tube-filter, #fl-refrigerant, #fl-coil-material, #fl-defrost-type, #fl-refrigerant-feed, #fl-esp, #fl-capacity-under, #fl-capacity-over, #fl-fpi-filter, #fl-tube-filter, #dt-refrigerant, #dt-coil-material, #dt-defrost-type, #dt-refrigerant-feed, #dt-capacity-under, #dt-capacity-over, #dt-fpi-filter, #dt-rows-filter, #dt-series-filter, #dt-tube-filter")) {
+for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigerant, #Condensing\\ Temperature, #Wet\\ Bulb\\ Temperature, #Motor\\ Voltage, #Upper\\ Tolerance, #Lower\\ Tolerance, #room-load, #number-of-evaporators, #room-temperature, #target-td, #btr-refrigerant, #coil-material, #defrost-type, #refrigerant-feed, #reheat-coil, #btr-capacity-under, #btr-capacity-over, #stc-refrigerant, #stc-coil-material, #stc-defrost-type, #stc-refrigerant-feed, #stc-capacity-under, #stc-capacity-over, #stc-fpi-filter, #cf-refrigerant, #cf-coil-material, #cf-defrost-type, #cf-refrigerant-feed, #cf-esp, #cf-capacity-under, #cf-capacity-over, #cf-fpi-filter, #cf-tube-filter, #fl-refrigerant, #fl-coil-material, #fl-defrost-type, #fl-refrigerant-feed, #fl-esp, #fl-capacity-under, #fl-capacity-over, #fl-fpi-filter, #fl-tube-filter, #dt-refrigerant, #dt-coil-material, #dt-defrost-type, #dt-refrigerant-feed, #dt-reheat-coil, #dt-capacity-under, #dt-capacity-over, #dt-fpi-filter, #dt-rows-filter, #dt-series-filter, #dt-tube-filter")) {
     for (const eventName of ["input", "change"]) {
         input.addEventListener(eventName, () => {
             if (input.matches("[data-btr-design-input]")) {
@@ -2828,7 +2858,7 @@ for (const input of document.querySelectorAll("#Capacity, #max-cells, #Refrigera
                 clearFlResults();
             } else if (input.matches("#fl-capacity-under, #fl-capacity-over, #fl-fpi-filter, #fl-tube-filter")) {
                 clearFlResults();
-            } else if (input.matches("#dt-refrigerant, #dt-coil-material, #dt-defrost-type, #dt-refrigerant-feed")) {
+            } else if (input.matches("#dt-refrigerant, #dt-coil-material, #dt-defrost-type, #dt-refrigerant-feed, #dt-reheat-coil")) {
                 syncDtSelectionOptions();
                 updateBtrSelectionVisibility();
                 clearDtResults();
@@ -3250,6 +3280,7 @@ if (Number.isInteger(quoteUnitNumber) && quoteUnitNumber >= 1 && quoteUnitNumber
                     syncDtSelectionOptions();
                     dtDefrostTypeSelect.value = savedUnit.defrostType ?? "A";
                     dtRefrigerantFeedSelect.value = savedUnit.refrigerantFeed ?? "RB";
+                    dtReheatCoilSelect.value = savedUnit.reheatCoil ?? "";
                     dtCapacityUnderInput.value = String(savedUnit.capacityUnder ?? -15);
                     dtCapacityOverInput.value = String(savedUnit.capacityOver ?? 15);
                     dtFpiFilterSelect.value = savedUnit.fpiFilter ?? "";

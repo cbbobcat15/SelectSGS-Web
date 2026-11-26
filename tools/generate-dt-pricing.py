@@ -43,7 +43,9 @@ OPTIONS = [("DT_Pan_SS_Ins_Cover", "Full Coverage Drain Pan w/ SS Insulated Cove
            ("DT_Add_Hdrs_HGR", "Add'l Set of Hdrs for Hot Gas Reheat, or Distributor & Hdr", ("flat", "H119")),
            ("DT_Brass_Distributor", "Brass Distributor on Steel Coil", ("none",)),
            ("DT_TEV_Mount", "Mounted TEV (Copper Coils Only)", ("none",)),
-           ("DT_Coil_End_Covers", "Coil End Covers (ED/EDL/WD)", ("none",))]
+           ("DT_Coil_End_Covers", "Coil End Covers (ED/EDL/WD)", ("none",)),
+           # Required with the HGR reheat coil selection (REHEAT_CODE = HGR in the database), as on the BTR.
+           ("DT_Add_Head_HGR", "Add'l Set of Headers for Hot Gas Reheat", ("none",))]
 
 DB_OPTION_CODES = ["FCPan_SS_IA_IHGC_IED", "FCPan_SS_Welded_IA_IHGC_IED", "FCPan_SS_Welded_HGP_HGS_HTP_HTS", "SS_Casing",
                    "Gold_Epx_Pre", "Elec_Fin_Coat", "Heresite_C", "Motor_Eff_0.5_2S", "inv_ready_mtr"]
@@ -72,7 +74,7 @@ DB_OPTION_MAP = {"DT_Pan_SS_Ins_Cover": "FCPan_SS_IA_IHGC_IED", "DT_Pan_Hygienic
                  "DT_Gold_Epoxy_Fins": "Gold_Epx_Pre", "DT_Electrofin": "Elec_Fin_Coat", "DT_Heresite": "Heresite_C",
                  "DT_Two_Speed_Motor": "Motor_Eff_0.5_2S", "DT_Inverter_Duty_Motor": "inv_ready_mtr",
                  "DT_Heat_Tape_115": "FCPan_HeatTape_115", "DT_Heat_Tape_230": "FCPan_HeatTape_230",
-                 "DT_Brass_Distributor": "Brass_Distr", "DT_TEV_Mount": "TEV_Mount", "DT_Coil_End_Covers": "Coil_End_Covers",
+                 "DT_Brass_Distributor": "Brass_Distr", "DT_TEV_Mount": "TEV_Mount", "DT_Coil_End_Covers": "Coil_End_Covers", "DT_Add_Head_HGR": "Add_Head_HGR",
                  "DT_Long_Throw_Adapter": "Long_Throw",
                  "DT_Electric_Reheat": "Reheat_per_Fan_6R", "DT_Add_Hdrs_HGR": "Add_Head_HGR_D"}
 
