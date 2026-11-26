@@ -1061,7 +1061,6 @@ function getDtModelNumber(unit) {
     const materialCode = { AL: "A", SS: "B", CU: "C", HDG: "S" }[unit.coilMaterial];
     const refrigerantCode = { R717: "A", R22: "V", R404A: "S", R507: "P" }[unit.refrigerant ?? "R717"];
     const digits = /^(DTX?)-\d-(\d+)$/.exec(unit.model ?? "")?.[2];
-    // The HGR reheat coil adds two rows to the rated coil: "/2" follows the model digits, as on the BTR.
     if (!materialCode || !refrigerantCode || !digits || !unit.refrigerantFeed || !unit.defrostType) return "Unavailable";
     const selectedIds = (unit.options ?? []).map(option => option.optionId);
     const insulatedPanSelected = selectedIds.some(id => dtInsulatedPanOptionIds.includes(id));
@@ -1075,7 +1074,7 @@ function getDtModelNumber(unit) {
         : selectedIds.includes("DT_Heresite") ? "-HC"
         : selectedIds.includes("DT_Gold_Epoxy_Fins") ? "-GF" : "";
     const series = unit.series === "DTX" ? "DTX" : "DT";
-    return `${series}${unit.tube === "C" ? "C" : "D"}${materialCode}${unit.fans}-${digits}${unit.reheatCoil === "HGR" ? "/2" : ""}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
+    return `${series}${unit.tube === "C" ? "C" : "D"}${materialCode}${unit.fans}-${digits}-${unit.refrigerantFeed}${refrigerantCode}-${defrostCode}${reheat}${coating}`;
 }
 
 function getEvaporatorModelNumber(unit) {

@@ -28,7 +28,7 @@ DT/DTX (draw-through unit coolers, 1–6 fans, 22" propeller fans at 1140 RPM) u
 
 ## Model number
 
-`<DT|DTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR (the HGR reheat coil also appends /2 to the capacity digits, e.g. `DTDA5-1034/2-RBA-A-HGR`); coating is -EF, -HC or -GF. Coil connection hand is not a selection input and is omitted.
+`<DT|DTX><D (3/4") or C (5/8")><material><fans>-<capacity>-<feed><refrigerant>-<defrost><reheat><coating>`, for example `DTXDA6-2181-RBA-HGS-HGR-EF`. Material is S (steel), A (aluminum), C (copper) or B (stainless); refrigerant is A (R717), V (R22), S (R404A) or P (R507); reheat is -ERH or -HGR (an HGR reheat coil adds `-HGR` only, e.g. `DTDA5-1034-RBA-A-HGR`; no `/2`); coating is -EF, -HC or -GF. Coil connection hand is not a selection input and is omitted.
 
 ## Dimensions
 
